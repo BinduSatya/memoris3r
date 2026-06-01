@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createS3Client, getBucketRetention, setBucketRetention } from '$lib/server/s3';
+import { createS3Client, bucket as bucketApi } from '$lib/server/s3';
 
 export const GET: RequestHandler = async ({ url, locals }) => {
 	try {
@@ -11,7 +11,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		}
 
 		const client = createS3Client(locals.credentials!);
-		const retention = await getBucketRetention(client, bucket);
+		const retention = await bucketApi.getRetention(client, bucket);
 
 		return json(retention);
 	} catch (err: any) {
@@ -42,7 +42,7 @@ export const PUT: RequestHandler = async ({ request, locals }) => {
 		}
 
 		const client = createS3Client(locals.credentials!);
-		await setBucketRetention(client, bucket, mode, days, years);
+		await bucketApi.setRetention(client, bucket, mode, days, years);
 
 		return json({ success: true });
 	} catch (err: any) {

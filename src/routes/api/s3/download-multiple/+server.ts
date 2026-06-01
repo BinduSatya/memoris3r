@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createS3Client, getObjectStream } from '$lib/server/s3';
+import { createS3Client, object } from '$lib/server/s3';
 import archiver from 'archiver';
 import { Readable, PassThrough } from 'stream';
 
@@ -32,7 +32,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		// Add each file to the archive
 		for (const key of keys) {
 			try {
-				const stream = await getObjectStream(client, bucket, key);
+				const stream = await object.getStream(client, bucket, key);
 				archive.append(stream as Readable, { name: key });
 			} catch (err: any) {
 				console.error(`Failed to fetch object "${key}":`, err.message);

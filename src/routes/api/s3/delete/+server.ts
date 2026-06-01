@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createS3Client, deleteObjects, deleteObjectVersion } from '$lib/server/s3';
+import { createS3Client, object } from '$lib/server/s3';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
@@ -15,12 +15,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		// Version-specific deletion: single key + versionId
 		if (versionId && typeof versionId === 'string' && keys.length === 1) {
-			await deleteObjectVersion(client, bucket, keys[0], versionId);
+			await object.deleteVersion(client, bucket, keys[0], versionId);
 			return json({ success: true, deleted: 1 });
 		}
 
 		// Bulk delete (existing behavior)
-		await deleteObjects(client, bucket, keys);
+		await object.deleteMany(client, bucket, keys);
 
 		return json({ success: true, deleted: keys.length });
 	} catch (err: any) {

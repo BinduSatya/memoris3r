@@ -71,50 +71,7 @@ vi.mock('@aws-sdk/s3-request-presigner', () => ({
 }));
 
 // Import after mocks are set up
-import {
-	createS3Client,
-	listBuckets,
-	listObjects,
-	deleteObject,
-	deleteObjects,
-	createFolder,
-	headObject,
-	createBucket,
-	deleteBucket,
-	getBucketInfo,
-	listObjectVersions,
-	restoreObjectVersion,
-	deleteObjectVersion,
-	getObjectTags,
-	setObjectTags,
-	getBucketVersioning,
-	setBucketVersioning,
-	getBucketTags,
-	setBucketTags,
-	deleteBucketTags,
-	getBucketPolicy,
-	setBucketPolicy,
-	deleteBucketPolicy,
-	getObjectLegalHold,
-	setObjectLegalHold,
-	getObjectRetention,
-	setObjectRetention,
-	getBucketRetention,
-	setBucketRetention,
-	getBucketCors,
-	setBucketCors,
-	deleteBucketCors,
-	copyObject,
-	copyFolder,
-	moveObject,
-	moveFolder,
-	searchObjects,
-	initiateMultipartUpload,
-	getPresignedPartUrl,
-	completeMultipartUpload,
-	abortMultipartUpload,
-	listUploadParts
-} from './s3';
+import { createS3Client, object, bucket } from './s3';
 
 // Helper to create a client for tests
 function makeClient() {
@@ -192,7 +149,7 @@ describe('listBuckets', () => {
 			]
 		});
 
-		const result = await listBuckets(makeClient());
+		const result = await bucket.list(makeClient());
 
 		expect(result).toEqual([
 			{ name: 'bucket-1', creationDate: '2024-01-15T10:00:00.000Z' },
@@ -203,7 +160,7 @@ describe('listBuckets', () => {
 	it('returns empty array when no buckets', async () => {
 		mockSend.mockResolvedValueOnce({ Buckets: undefined });
 
-		const result = await listBuckets(makeClient());
+		const result = await bucket.list(makeClient());
 		expect(result).toEqual([]);
 	});
 
@@ -212,7 +169,7 @@ describe('listBuckets', () => {
 			Buckets: [{ Name: undefined, CreationDate: undefined }]
 		});
 
-		const result = await listBuckets(makeClient());
+		const result = await bucket.list(makeClient());
 		expect(result).toEqual([{ name: '', creationDate: undefined }]);
 	});
 });
@@ -241,7 +198,7 @@ describe('listObjects', () => {
 			NextContinuationToken: undefined
 		});
 
-		const result = await listObjects(makeClient(), 'test-bucket');
+		const result = await object.list(makeClient(), 'test-bucket');
 
 		// Folders come first
 		expect(result.objects[0]).toEqual({
@@ -285,7 +242,7 @@ describe('listObjects', () => {
 			IsTruncated: false
 		});
 
-		const result = await listObjects(makeClient(), 'test-bucket', 'documents/');
+		const result = await object.list(makeClient(), 'test-bucket', 'documents/');
 
 		const fileKeys = result.objects.map((o) => o.key);
 		expect(fileKeys).not.toContain('documents/');
@@ -301,7 +258,7 @@ describe('listObjects', () => {
 			IsTruncated: false
 		});
 
-		const result = await listObjects(makeClient(), 'test-bucket', 'docs/');
+		const result = await object.list(makeClient(), 'test-bucket', 'docs/');
 
 		const file = result.objects.find((o) => !o.isFolder);
 		expect(file?.name).toBe('readme.txt');
@@ -317,7 +274,7 @@ describe('listObjects', () => {
 			IsTruncated: false
 		});
 
-		const result = await listObjects(makeClient(), 'empty-bucket');
+		const result = await object.list(makeClient(), 'empty-bucket');
 
 		expect(result.objects).toEqual([]);
 		expect(result.folders).toEqual([]);
@@ -331,7 +288,7 @@ describe('listObjects', () => {
 			IsTruncated: false
 		});
 
-		await listObjects(makeClient(), 'bucket', 'prefix/', 'token-123', 50);
+		await object.list(makeClient(), 'bucket', 'prefix/', 'token-123', 50);
 
 		// Verify the command was constructed with correct params
 		expect(mockSend).toHaveBeenCalledWith(
@@ -353,7 +310,7 @@ describe('listObjects', () => {
 			NextContinuationToken: 'next-page-token'
 		});
 
-		const result = await listObjects(makeClient(), 'bucket');
+		const result = await object.list(makeClient(), 'bucket');
 
 		expect(result.isTruncated).toBe(true);
 		expect(result.continuationToken).toBe('next-page-token');
@@ -366,7 +323,7 @@ describe('deleteObject', () => {
 	it('sends DeleteObjectCommand with correct params', async () => {
 		mockSend.mockResolvedValueOnce({});
 
-		await deleteObject(makeClient(), 'my-bucket', 'path/to/file.txt');
+		await object.delete(makeClient(), 'my-bucket', 'path/to/file.txt');
 
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -382,7 +339,7 @@ describe('deleteObjects', () => {
 	it('deletes multiple objects sequentially', async () => {
 		mockSend.mockResolvedValue({});
 
-		await deleteObjects(makeClient(), 'bucket', ['file1.txt', 'file2.txt', 'file3.txt']);
+		await object.deleteMany(makeClient(), 'bucket', ['file1.txt', 'file2.txt', 'file3.txt']);
 
 		expect(mockSend).toHaveBeenCalledTimes(3);
 	});
@@ -394,7 +351,7 @@ describe('createFolder', () => {
 	it('appends trailing slash to key', async () => {
 		mockSend.mockResolvedValueOnce({});
 
-		await createFolder(makeClient(), 'bucket', 'my-folder');
+		await object.createFolder(makeClient(), 'bucket', 'my-folder');
 
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -409,7 +366,7 @@ describe('createFolder', () => {
 	it('does not double-append slash if already present', async () => {
 		mockSend.mockResolvedValueOnce({});
 
-		await createFolder(makeClient(), 'bucket', 'my-folder/');
+		await object.createFolder(makeClient(), 'bucket', 'my-folder/');
 
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -433,7 +390,7 @@ describe('headObject', () => {
 			Metadata: { 'x-custom': 'value' }
 		});
 
-		const result = await headObject(makeClient(), 'bucket', 'data.json');
+		const result = await object.head(makeClient(), 'bucket', 'data.json');
 
 		expect(result).toEqual({
 			key: 'data.json',
@@ -456,7 +413,7 @@ describe('headObject', () => {
 			Metadata: {}
 		});
 
-		const result = await headObject(makeClient(), 'bucket', 'file.txt');
+		const result = await object.head(makeClient(), 'bucket', 'file.txt');
 		expect(result.etag).toBe('quoted-etag');
 	});
 
@@ -471,7 +428,7 @@ describe('headObject', () => {
 			Metadata: undefined
 		});
 
-		const result = await headObject(makeClient(), 'bucket', 'file.txt');
+		const result = await object.head(makeClient(), 'bucket', 'file.txt');
 
 		expect(result.size).toBe(0);
 		expect(result.lastModified).toBe('');
@@ -489,7 +446,7 @@ describe('createBucket', () => {
 	it('creates bucket with basic params', async () => {
 		mockSend.mockResolvedValueOnce({});
 
-		await createBucket(makeClient(), 'new-bucket');
+		await bucket.create(makeClient(), 'new-bucket');
 
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -502,7 +459,7 @@ describe('createBucket', () => {
 	it('creates bucket with versioning enabled', async () => {
 		mockSend.mockResolvedValue({}); // CreateBucket + PutBucketVersioning
 
-		await createBucket(makeClient(), 'versioned-bucket', { versioning: true });
+		await bucket.create(makeClient(), 'versioned-bucket', { versioning: true });
 
 		// Should call send twice: CreateBucket + PutBucketVersioning
 		expect(mockSend).toHaveBeenCalledTimes(2);
@@ -518,7 +475,7 @@ describe('createBucket', () => {
 	it('creates bucket with object locking (skips separate versioning call)', async () => {
 		mockSend.mockResolvedValue({});
 
-		await createBucket(makeClient(), 'locked-bucket', {
+		await bucket.create(makeClient(), 'locked-bucket', {
 			versioning: true,
 			objectLocking: true
 		});
@@ -541,7 +498,7 @@ describe('deleteBucket', () => {
 	it('sends DeleteBucketCommand', async () => {
 		mockSend.mockResolvedValueOnce({});
 
-		await deleteBucket(makeClient(), 'old-bucket');
+		await bucket.delete(makeClient(), 'old-bucket');
 
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -567,7 +524,7 @@ describe('getBucketInfo', () => {
 			ObjectLockConfiguration: { ObjectLockEnabled: 'Enabled' }
 		});
 
-		const result = await getBucketInfo(makeClient(), 'my-bucket');
+		const result = await bucket.getInfo(makeClient(), 'my-bucket');
 
 		expect(result).toEqual({
 			name: 'my-bucket',
@@ -584,7 +541,7 @@ describe('getBucketInfo', () => {
 			ObjectLockConfiguration: { ObjectLockEnabled: 'Disabled' }
 		});
 
-		const result = await getBucketInfo(makeClient(), 'bucket');
+		const result = await bucket.getInfo(makeClient(), 'bucket');
 		expect(result.versioning).toBe('Suspended');
 	});
 
@@ -593,7 +550,7 @@ describe('getBucketInfo', () => {
 		mockSend.mockResolvedValueOnce({ TagSet: [] });
 		mockSend.mockResolvedValueOnce({ ObjectLockConfiguration: {} });
 
-		const result = await getBucketInfo(makeClient(), 'bucket');
+		const result = await bucket.getInfo(makeClient(), 'bucket');
 		expect(result.versioning).toBe('Disabled');
 	});
 
@@ -602,7 +559,7 @@ describe('getBucketInfo', () => {
 		mockSend.mockRejectedValueOnce({ name: 'NoSuchTagSet' });
 		mockSend.mockResolvedValueOnce({ ObjectLockConfiguration: {} });
 
-		const result = await getBucketInfo(makeClient(), 'bucket');
+		const result = await bucket.getInfo(makeClient(), 'bucket');
 		expect(result.tags).toEqual({});
 	});
 
@@ -611,7 +568,7 @@ describe('getBucketInfo', () => {
 		mockSend.mockResolvedValueOnce({ TagSet: [] });
 		mockSend.mockRejectedValueOnce({ name: 'ObjectLockConfigurationNotFoundError' });
 
-		const result = await getBucketInfo(makeClient(), 'bucket');
+		const result = await bucket.getInfo(makeClient(), 'bucket');
 		expect(result.objectLocking).toBe(false);
 	});
 
@@ -619,7 +576,7 @@ describe('getBucketInfo', () => {
 		mockSend.mockResolvedValueOnce({ Status: 'Enabled' });
 		mockSend.mockRejectedValueOnce(new Error('NetworkError'));
 
-		await expect(getBucketInfo(makeClient(), 'bucket')).rejects.toThrow('NetworkError');
+		await expect(bucket.getInfo(makeClient(), 'bucket')).rejects.toThrow('NetworkError');
 	});
 });
 
@@ -661,7 +618,7 @@ describe('listObjectVersions', () => {
 			NextVersionIdMarker: undefined
 		});
 
-		const result = await listObjectVersions(makeClient(), 'bucket', 'file.txt');
+		const result = await object.listVersions(makeClient(), 'bucket', 'file.txt');
 
 		expect(result.versions).toHaveLength(2);
 		expect(result.versions[0]).toEqual({
@@ -695,7 +652,7 @@ describe('listObjectVersions', () => {
 			IsTruncated: false
 		});
 
-		const result = await listObjectVersions(makeClient(), 'bucket', 'file.txt');
+		const result = await object.listVersions(makeClient(), 'bucket', 'file.txt');
 
 		expect(result.versions).toEqual([]);
 		expect(result.deleteMarkers).toEqual([]);
@@ -708,7 +665,7 @@ describe('restoreObjectVersion', () => {
 	it('constructs correct CopySource with URL encoding', async () => {
 		mockSend.mockResolvedValueOnce({});
 
-		await restoreObjectVersion(makeClient(), 'bucket', 'path/to/file.txt', 'version-123');
+		await object.restoreVersion(makeClient(), 'bucket', 'path/to/file.txt', 'version-123');
 
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -727,7 +684,7 @@ describe('deleteObjectVersion', () => {
 	it('sends DeleteObjectCommand with VersionId', async () => {
 		mockSend.mockResolvedValueOnce({});
 
-		await deleteObjectVersion(makeClient(), 'bucket', 'file.txt', 'v1');
+		await object.deleteVersion(makeClient(), 'bucket', 'file.txt', 'v1');
 
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -751,14 +708,14 @@ describe('getObjectTags', () => {
 			]
 		});
 
-		const tags = await getObjectTags(makeClient(), 'bucket', 'file.txt');
+		const tags = await object.getTags(makeClient(), 'bucket', 'file.txt');
 		expect(tags).toEqual({ env: 'prod', team: 'backend' });
 	});
 
 	it('returns empty object when no tags', async () => {
 		mockSend.mockResolvedValueOnce({ TagSet: [] });
 
-		const tags = await getObjectTags(makeClient(), 'bucket', 'file.txt');
+		const tags = await object.getTags(makeClient(), 'bucket', 'file.txt');
 		expect(tags).toEqual({});
 	});
 });
@@ -767,7 +724,7 @@ describe('setObjectTags', () => {
 	it('converts key-value object to TagSet', async () => {
 		mockSend.mockResolvedValueOnce({});
 
-		await setObjectTags(makeClient(), 'bucket', 'file.txt', { env: 'prod', team: 'backend' });
+		await object.setTags(makeClient(), 'bucket', 'file.txt', { env: 'prod', team: 'backend' });
 
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -790,17 +747,17 @@ describe('setObjectTags', () => {
 describe('getBucketVersioning', () => {
 	it('returns Enabled when versioning is on', async () => {
 		mockSend.mockResolvedValueOnce({ Status: 'Enabled' });
-		expect(await getBucketVersioning(makeClient(), 'bucket')).toBe('Enabled');
+		expect(await bucket.getVersioning(makeClient(), 'bucket')).toBe('Enabled');
 	});
 
 	it('returns Suspended when versioning is suspended', async () => {
 		mockSend.mockResolvedValueOnce({ Status: 'Suspended' });
-		expect(await getBucketVersioning(makeClient(), 'bucket')).toBe('Suspended');
+		expect(await bucket.getVersioning(makeClient(), 'bucket')).toBe('Suspended');
 	});
 
 	it('returns Disabled when no versioning status', async () => {
 		mockSend.mockResolvedValueOnce({ Status: undefined });
-		expect(await getBucketVersioning(makeClient(), 'bucket')).toBe('Disabled');
+		expect(await bucket.getVersioning(makeClient(), 'bucket')).toBe('Disabled');
 	});
 });
 
@@ -808,7 +765,7 @@ describe('setBucketVersioning', () => {
 	it('enables versioning', async () => {
 		mockSend.mockResolvedValueOnce({});
 
-		await setBucketVersioning(makeClient(), 'bucket', true);
+		await bucket.setVersioning(makeClient(), 'bucket', true);
 
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -822,7 +779,7 @@ describe('setBucketVersioning', () => {
 	it('suspends versioning', async () => {
 		mockSend.mockResolvedValueOnce({});
 
-		await setBucketVersioning(makeClient(), 'bucket', false);
+		await bucket.setVersioning(makeClient(), 'bucket', false);
 
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -840,28 +797,28 @@ describe('getBucketTags', () => {
 			TagSet: [{ Key: 'env', Value: 'staging' }]
 		});
 
-		const tags = await getBucketTags(makeClient(), 'bucket');
+		const tags = await bucket.getTags(makeClient(), 'bucket');
 		expect(tags).toEqual({ env: 'staging' });
 	});
 
 	it('returns empty object on NoSuchTagSet', async () => {
 		mockSend.mockRejectedValueOnce({ name: 'NoSuchTagSet' });
 
-		const tags = await getBucketTags(makeClient(), 'bucket');
+		const tags = await bucket.getTags(makeClient(), 'bucket');
 		expect(tags).toEqual({});
 	});
 
 	it('returns empty object on NoSuchTagSet (Code variant)', async () => {
 		mockSend.mockRejectedValueOnce({ Code: 'NoSuchTagSet' });
 
-		const tags = await getBucketTags(makeClient(), 'bucket');
+		const tags = await bucket.getTags(makeClient(), 'bucket');
 		expect(tags).toEqual({});
 	});
 
 	it('re-throws unexpected errors', async () => {
 		mockSend.mockRejectedValueOnce(new Error('AccessDenied'));
 
-		await expect(getBucketTags(makeClient(), 'bucket')).rejects.toThrow('AccessDenied');
+		await expect(bucket.getTags(makeClient(), 'bucket')).rejects.toThrow('AccessDenied');
 	});
 });
 
@@ -869,7 +826,7 @@ describe('setBucketTags', () => {
 	it('converts tags to TagSet', async () => {
 		mockSend.mockResolvedValueOnce({});
 
-		await setBucketTags(makeClient(), 'bucket', { env: 'prod' });
+		await bucket.setTags(makeClient(), 'bucket', { env: 'prod' });
 
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -887,7 +844,7 @@ describe('deleteBucketTags', () => {
 	it('sends DeleteBucketTaggingCommand', async () => {
 		mockSend.mockResolvedValueOnce({});
 
-		await deleteBucketTags(makeClient(), 'bucket');
+		await bucket.deleteTags(makeClient(), 'bucket');
 
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -905,28 +862,28 @@ describe('getBucketPolicy', () => {
 		const policy = JSON.stringify({ Version: '2012-10-17', Statement: [] });
 		mockSend.mockResolvedValueOnce({ Policy: policy });
 
-		const result = await getBucketPolicy(makeClient(), 'bucket');
+		const result = await bucket.getPolicy(makeClient(), 'bucket');
 		expect(result).toBe(policy);
 	});
 
 	it('returns null when no policy exists', async () => {
 		mockSend.mockRejectedValueOnce({ name: 'NoSuchBucketPolicy' });
 
-		const result = await getBucketPolicy(makeClient(), 'bucket');
+		const result = await bucket.getPolicy(makeClient(), 'bucket');
 		expect(result).toBeNull();
 	});
 
 	it('returns null when no policy exists (Code variant)', async () => {
 		mockSend.mockRejectedValueOnce({ Code: 'NoSuchBucketPolicy' });
 
-		const result = await getBucketPolicy(makeClient(), 'bucket');
+		const result = await bucket.getPolicy(makeClient(), 'bucket');
 		expect(result).toBeNull();
 	});
 
 	it('re-throws unexpected errors', async () => {
 		mockSend.mockRejectedValueOnce(new Error('InternalError'));
 
-		await expect(getBucketPolicy(makeClient(), 'bucket')).rejects.toThrow('InternalError');
+		await expect(bucket.getPolicy(makeClient(), 'bucket')).rejects.toThrow('InternalError');
 	});
 });
 
@@ -935,7 +892,7 @@ describe('setBucketPolicy', () => {
 		mockSend.mockResolvedValueOnce({});
 		const policy = '{"Version":"2012-10-17","Statement":[]}';
 
-		await setBucketPolicy(makeClient(), 'bucket', policy);
+		await bucket.setPolicy(makeClient(), 'bucket', policy);
 
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -951,7 +908,7 @@ describe('deleteBucketPolicy', () => {
 	it('sends DeleteBucketPolicyCommand', async () => {
 		mockSend.mockResolvedValueOnce({});
 
-		await deleteBucketPolicy(makeClient(), 'bucket');
+		await bucket.deletePolicy(makeClient(), 'bucket');
 
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -968,14 +925,14 @@ describe('getObjectLegalHold', () => {
 	it('returns ON when legal hold is active', async () => {
 		mockSend.mockResolvedValueOnce({ LegalHold: { Status: 'ON' } });
 
-		const result = await getObjectLegalHold(makeClient(), 'bucket', 'file.txt');
+		const result = await object.getLegalHold(makeClient(), 'bucket', 'file.txt');
 		expect(result).toBe('ON');
 	});
 
 	it('returns OFF when no legal hold', async () => {
 		mockSend.mockResolvedValueOnce({ LegalHold: { Status: undefined } });
 
-		const result = await getObjectLegalHold(makeClient(), 'bucket', 'file.txt');
+		const result = await object.getLegalHold(makeClient(), 'bucket', 'file.txt');
 		expect(result).toBe('OFF');
 	});
 });
@@ -984,7 +941,7 @@ describe('setObjectLegalHold', () => {
 	it('sets legal hold ON', async () => {
 		mockSend.mockResolvedValueOnce({});
 
-		await setObjectLegalHold(makeClient(), 'bucket', 'file.txt', 'ON');
+		await object.setLegalHold(makeClient(), 'bucket', 'file.txt', 'ON');
 
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -999,7 +956,7 @@ describe('setObjectLegalHold', () => {
 	it('sets legal hold OFF', async () => {
 		mockSend.mockResolvedValueOnce({});
 
-		await setObjectLegalHold(makeClient(), 'bucket', 'file.txt', 'OFF');
+		await object.setLegalHold(makeClient(), 'bucket', 'file.txt', 'OFF');
 
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -1020,7 +977,7 @@ describe('getObjectRetention', () => {
 			}
 		});
 
-		const result = await getObjectRetention(makeClient(), 'bucket', 'file.txt');
+		const result = await object.getRetention(makeClient(), 'bucket', 'file.txt');
 		expect(result).toEqual({
 			mode: 'GOVERNANCE',
 			retainUntilDate: '2025-12-31T00:00:00.000Z'
@@ -1030,14 +987,14 @@ describe('getObjectRetention', () => {
 	it('returns null values when no retention configured', async () => {
 		mockSend.mockRejectedValueOnce({ name: 'NoSuchObjectLockConfiguration' });
 
-		const result = await getObjectRetention(makeClient(), 'bucket', 'file.txt');
+		const result = await object.getRetention(makeClient(), 'bucket', 'file.txt');
 		expect(result).toEqual({ mode: null, retainUntilDate: null });
 	});
 
 	it('returns null values for ObjectLockConfigurationNotFoundError', async () => {
 		mockSend.mockRejectedValueOnce({ name: 'ObjectLockConfigurationNotFoundError' });
 
-		const result = await getObjectRetention(makeClient(), 'bucket', 'file.txt');
+		const result = await object.getRetention(makeClient(), 'bucket', 'file.txt');
 		expect(result).toEqual({ mode: null, retainUntilDate: null });
 	});
 });
@@ -1046,7 +1003,7 @@ describe('setObjectRetention', () => {
 	it('sets GOVERNANCE retention', async () => {
 		mockSend.mockResolvedValueOnce({});
 
-		await setObjectRetention(makeClient(), 'bucket', 'file.txt', 'GOVERNANCE', '2025-12-31T00:00:00Z');
+		await object.setRetention(makeClient(), 'bucket', 'file.txt', 'GOVERNANCE', '2025-12-31T00:00:00Z');
 
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -1064,7 +1021,7 @@ describe('setObjectRetention', () => {
 	it('passes bypassGovernance flag', async () => {
 		mockSend.mockResolvedValueOnce({});
 
-		await setObjectRetention(makeClient(), 'bucket', 'file.txt', 'GOVERNANCE', '2025-12-31T00:00:00Z', true);
+		await object.setRetention(makeClient(), 'bucket', 'file.txt', 'GOVERNANCE', '2025-12-31T00:00:00Z', true);
 
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -1090,7 +1047,7 @@ describe('getBucketRetention', () => {
 			}
 		});
 
-		const result = await getBucketRetention(makeClient(), 'bucket');
+		const result = await bucket.getRetention(makeClient(), 'bucket');
 		expect(result).toEqual({
 			enabled: true,
 			mode: 'GOVERNANCE',
@@ -1107,14 +1064,14 @@ describe('getBucketRetention', () => {
 			}
 		});
 
-		const result = await getBucketRetention(makeClient(), 'bucket');
+		const result = await bucket.getRetention(makeClient(), 'bucket');
 		expect(result).toEqual({ enabled: true });
 	});
 
 	it('returns disabled when lock not configured', async () => {
 		mockSend.mockRejectedValueOnce({ name: 'ObjectLockConfigurationNotFoundError' });
 
-		const result = await getBucketRetention(makeClient(), 'bucket');
+		const result = await bucket.getRetention(makeClient(), 'bucket');
 		expect(result).toEqual({ enabled: false });
 	});
 
@@ -1125,7 +1082,7 @@ describe('getBucketRetention', () => {
 			}
 		});
 
-		const result = await getBucketRetention(makeClient(), 'bucket');
+		const result = await bucket.getRetention(makeClient(), 'bucket');
 		expect(result).toEqual({ enabled: false });
 	});
 
@@ -1142,7 +1099,7 @@ describe('getBucketRetention', () => {
 			}
 		});
 
-		const result = await getBucketRetention(makeClient(), 'bucket');
+		const result = await bucket.getRetention(makeClient(), 'bucket');
 		expect(result).toEqual({
 			enabled: true,
 			mode: 'COMPLIANCE',
@@ -1156,7 +1113,7 @@ describe('setBucketRetention', () => {
 	it('sets GOVERNANCE retention with days', async () => {
 		mockSend.mockResolvedValueOnce({});
 
-		await setBucketRetention(makeClient(), 'bucket', 'GOVERNANCE', 30);
+		await bucket.setRetention(makeClient(), 'bucket', 'GOVERNANCE', 30);
 
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -1179,7 +1136,7 @@ describe('setBucketRetention', () => {
 	it('sets COMPLIANCE retention with years', async () => {
 		mockSend.mockResolvedValueOnce({});
 
-		await setBucketRetention(makeClient(), 'bucket', 'COMPLIANCE', undefined, 5);
+		await bucket.setRetention(makeClient(), 'bucket', 'COMPLIANCE', undefined, 5);
 
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -1204,7 +1161,7 @@ describe('copyObject', () => {
 	it('sends CopyObjectCommand with correct params', async () => {
 		mockSend.mockResolvedValueOnce({});
 
-		await copyObject(makeClient(), 'src-bucket', 'file.txt', 'dest-bucket', 'copy.txt');
+		await object.copy(makeClient(), 'src-bucket', 'file.txt', 'dest-bucket', 'copy.txt');
 
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -1219,7 +1176,7 @@ describe('copyObject', () => {
 	it('URL-encodes the copy source', async () => {
 		mockSend.mockResolvedValueOnce({});
 
-		await copyObject(makeClient(), 'bucket', 'path/with spaces/file (1).txt', 'bucket', 'dest.txt');
+		await object.copy(makeClient(), 'bucket', 'path/with spaces/file (1).txt', 'bucket', 'dest.txt');
 
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -1246,7 +1203,7 @@ describe('copyFolder', () => {
 		mockSend.mockResolvedValueOnce({});
 		mockSend.mockResolvedValueOnce({});
 
-		const result = await copyFolder(makeClient(), 'bucket', 'src/', 'bucket', 'dest/');
+		const result = await object.copyFolder(makeClient(), 'bucket', 'src/', 'bucket', 'dest/');
 
 		expect(result.copied).toBe(3);
 		// Verify the copy commands were called with correct dest keys
@@ -1274,7 +1231,7 @@ describe('copyFolder', () => {
 		mockSend.mockResolvedValueOnce({});
 		mockSend.mockResolvedValueOnce({});
 
-		const result = await copyFolder(makeClient(), 'bucket', 'src/', 'bucket', 'dest/');
+		const result = await object.copyFolder(makeClient(), 'bucket', 'src/', 'bucket', 'dest/');
 		expect(result.copied).toBe(2);
 	});
 
@@ -1284,7 +1241,7 @@ describe('copyFolder', () => {
 			NextContinuationToken: undefined
 		});
 
-		const result = await copyFolder(makeClient(), 'bucket', 'empty/', 'bucket', 'dest/');
+		const result = await object.copyFolder(makeClient(), 'bucket', 'empty/', 'bucket', 'dest/');
 		expect(result.copied).toBe(0);
 	});
 });
@@ -1296,7 +1253,7 @@ describe('moveObject', () => {
 		// DeleteObject
 		mockSend.mockResolvedValueOnce({});
 
-		await moveObject(makeClient(), 'bucket', 'old.txt', 'bucket', 'new.txt');
+		await object.move(makeClient(), 'bucket', 'old.txt', 'bucket', 'new.txt');
 
 		expect(mockSend).toHaveBeenCalledTimes(2);
 		expect(mockSend).toHaveBeenCalledWith(
@@ -1335,7 +1292,7 @@ describe('moveFolder', () => {
 		mockSend.mockResolvedValueOnce({});
 		mockSend.mockResolvedValueOnce({});
 
-		const result = await moveFolder(makeClient(), 'bucket', 'src/', 'bucket', 'dest/');
+		const result = await object.moveFolder(makeClient(), 'bucket', 'src/', 'bucket', 'dest/');
 
 		expect(result.moved).toBe(2);
 		// Verify delete calls
@@ -1368,7 +1325,7 @@ describe('searchObjects', () => {
 			],
 			IsTruncated: false
 		});
-		const result = await searchObjects(makeClient(), 'bucket', '', 'txt');
+		const result = await object.search(makeClient(), 'bucket', '', 'txt');
 		expect(result.objects).toHaveLength(2); // Only .txt files match
 		expect(result.objects[0].key).toBe('docs/readme.txt');
 		expect(result.objects[1].key).toBe('docs/sub/notes.txt');
@@ -1389,7 +1346,7 @@ describe('searchObjects', () => {
 			],
 			IsTruncated: false
 		});
-		const result = await searchObjects(makeClient(), 'bucket', '', 'readme');
+		const result = await object.search(makeClient(), 'bucket', '', 'readme');
 		expect(result.objects).toHaveLength(2);
 	});
 
@@ -1400,7 +1357,7 @@ describe('searchObjects', () => {
 			],
 			IsTruncated: false
 		});
-		await searchObjects(makeClient(), 'bucket', 'docs/', 'readme');
+		await object.search(makeClient(), 'bucket', 'docs/', 'readme');
 		const sentCommand = mockSend.mock.calls[0][0];
 		expect(sentCommand.Prefix).toBe('docs/');
 	});
@@ -1416,7 +1373,7 @@ describe('searchObjects', () => {
 				Contents: [{ Key: 'b-match.txt', Size: 1, LastModified: new Date() }],
 				IsTruncated: false
 			});
-		const result = await searchObjects(makeClient(), 'bucket', '', 'match');
+		const result = await object.search(makeClient(), 'bucket', '', 'match');
 		expect(result.objects).toHaveLength(1);
 		expect(result.objects[0].key).toBe('b-match.txt');
 		expect(mockSend).toHaveBeenCalledTimes(2);
@@ -1430,7 +1387,7 @@ describe('searchObjects', () => {
 			],
 			IsTruncated: false
 		});
-		const result = await searchObjects(makeClient(), 'bucket', '', 'a');
+		const result = await object.search(makeClient(), 'bucket', '', 'a');
 		expect(result.totalFound).toBe(2); // total scanned
 		expect(result.objects).toHaveLength(1); // only 'a.txt' matches
 	});
@@ -1442,7 +1399,7 @@ describe('searchObjects', () => {
 			],
 			IsTruncated: false
 		});
-		const result = await searchObjects(makeClient(), 'bucket', '', 'file');
+		const result = await object.search(makeClient(), 'bucket', '', 'file');
 		expect(result.objects[0].name).toBe('file.txt');
 		expect(result.objects[0].key).toBe('folder/sub/file.txt');
 		expect(result.objects[0].isFolder).toBe(false);
@@ -1460,7 +1417,7 @@ describe('searchObjects', () => {
 			NextContinuationToken: 'token1'
 		});
 		// maxKeys = 2, so should stop after finding 2 matches
-		const result = await searchObjects(makeClient(), 'bucket', '', '.txt', 2);
+		const result = await object.search(makeClient(), 'bucket', '', '.txt', 2);
 		expect(result.objects).toHaveLength(2);
 		// Should NOT have made a second call since we already have enough matches
 		expect(mockSend).toHaveBeenCalledTimes(1);
@@ -1471,7 +1428,7 @@ describe('searchObjects', () => {
 			Contents: [],
 			IsTruncated: false
 		});
-		const result = await searchObjects(makeClient(), 'bucket', '', 'nonexistent');
+		const result = await object.search(makeClient(), 'bucket', '', 'nonexistent');
 		expect(result.objects).toHaveLength(0);
 		expect(result.totalFound).toBe(0);
 	});
@@ -1482,7 +1439,7 @@ describe('searchObjects', () => {
 describe('initiateMultipartUpload', () => {
 	it('sends CreateMultipartUploadCommand with correct params', async () => {
 		mockSend.mockResolvedValueOnce({ UploadId: 'upload-123' });
-		const result = await initiateMultipartUpload(makeClient(), 'bucket', 'file.zip', 'application/zip');
+		const result = await object.initiateMultipart(makeClient(), 'bucket', 'file.zip', 'application/zip');
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
 				_type: 'CreateMultipartUpload',
@@ -1496,7 +1453,7 @@ describe('initiateMultipartUpload', () => {
 
 	it('uses default content type when not provided', async () => {
 		mockSend.mockResolvedValueOnce({ UploadId: 'upload-456' });
-		await initiateMultipartUpload(makeClient(), 'bucket', 'file.bin');
+		await object.initiateMultipart(makeClient(), 'bucket', 'file.bin');
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
 				_type: 'CreateMultipartUpload',
@@ -1508,7 +1465,7 @@ describe('initiateMultipartUpload', () => {
 
 describe('getPresignedPartUrl', () => {
 	it('generates presigned URL for a part', async () => {
-		const url = await getPresignedPartUrl(makeClient(), 'bucket', 'file.zip', 'upload-123', 1);
+		const url = await object.getPartUrl(makeClient(), 'bucket', 'file.zip', 'upload-123', 1);
 		expect(url).toBe('https://mocked-presigned-url.example.com/test');
 	});
 });
@@ -1521,7 +1478,7 @@ describe('completeMultipartUpload', () => {
 			{ PartNumber: 1, ETag: 'etag1' },
 			{ PartNumber: 2, ETag: 'etag2' }
 		];
-		await completeMultipartUpload(makeClient(), 'bucket', 'file.zip', 'upload-123', parts);
+		await object.completeMultipart(makeClient(), 'bucket', 'file.zip', 'upload-123', parts);
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
 				_type: 'CompleteMultipartUpload',
@@ -1543,7 +1500,7 @@ describe('completeMultipartUpload', () => {
 describe('abortMultipartUpload', () => {
 	it('sends AbortMultipartUploadCommand', async () => {
 		mockSend.mockResolvedValueOnce({});
-		await abortMultipartUpload(makeClient(), 'bucket', 'file.zip', 'upload-123');
+		await object.abortMultipart(makeClient(), 'bucket', 'file.zip', 'upload-123');
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
 				_type: 'AbortMultipartUpload',
@@ -1563,7 +1520,7 @@ describe('listUploadParts', () => {
 				{ PartNumber: 2, ETag: '"etag2"', Size: 512 }
 			]
 		});
-		const parts = await listUploadParts(makeClient(), 'bucket', 'file.zip', 'upload-123');
+		const parts = await object.listParts(makeClient(), 'bucket', 'file.zip', 'upload-123');
 		expect(parts).toEqual([
 			{ PartNumber: 1, ETag: '"etag1"', Size: 1024 },
 			{ PartNumber: 2, ETag: '"etag2"', Size: 512 }
@@ -1572,7 +1529,7 @@ describe('listUploadParts', () => {
 
 	it('returns empty array when no parts', async () => {
 		mockSend.mockResolvedValueOnce({ Parts: undefined });
-		const parts = await listUploadParts(makeClient(), 'bucket', 'file.zip', 'upload-123');
+		const parts = await object.listParts(makeClient(), 'bucket', 'file.zip', 'upload-123');
 		expect(parts).toEqual([]);
 	});
 });
@@ -1591,7 +1548,7 @@ describe('getBucketCors', () => {
 				MaxAgeSeconds: 3600
 			}]
 		});
-		const rules = await getBucketCors(makeClient(), 'bucket');
+		const rules = await bucket.getCors(makeClient(), 'bucket');
 		expect(rules).toEqual([{
 			id: 'rule1',
 			allowedOrigins: ['http://example.com'],
@@ -1604,24 +1561,24 @@ describe('getBucketCors', () => {
 
 	it('returns empty array when no CORS configured', async () => {
 		mockSend.mockRejectedValueOnce({ name: 'NoSuchCORSConfiguration' });
-		const rules = await getBucketCors(makeClient(), 'bucket');
+		const rules = await bucket.getCors(makeClient(), 'bucket');
 		expect(rules).toEqual([]);
 	});
 
 	it('returns empty array when no CORS configured (Code variant)', async () => {
 		mockSend.mockRejectedValueOnce({ Code: 'NoSuchCORSConfiguration' });
-		const rules = await getBucketCors(makeClient(), 'bucket');
+		const rules = await bucket.getCors(makeClient(), 'bucket');
 		expect(rules).toEqual([]);
 	});
 
 	it('throws on unexpected errors', async () => {
 		mockSend.mockRejectedValueOnce(new Error('Access Denied'));
-		await expect(getBucketCors(makeClient(), 'bucket')).rejects.toThrow('Access Denied');
+		await expect(bucket.getCors(makeClient(), 'bucket')).rejects.toThrow('Access Denied');
 	});
 
 	it('returns empty array when CORSRules is undefined', async () => {
 		mockSend.mockResolvedValueOnce({ CORSRules: undefined });
-		const rules = await getBucketCors(makeClient(), 'bucket');
+		const rules = await bucket.getCors(makeClient(), 'bucket');
 		expect(rules).toEqual([]);
 	});
 });
@@ -1629,7 +1586,7 @@ describe('getBucketCors', () => {
 describe('setBucketCors', () => {
 	it('sends PutBucketCorsCommand with correct params', async () => {
 		mockSend.mockResolvedValueOnce({});
-		await setBucketCors(makeClient(), 'bucket', [{
+		await bucket.setCors(makeClient(), 'bucket', [{
 			allowedOrigins: ['*'],
 			allowedMethods: ['GET'],
 			allowedHeaders: ['*'],
@@ -1643,7 +1600,7 @@ describe('setBucketCors', () => {
 
 	it('maps multiple rules correctly', async () => {
 		mockSend.mockResolvedValueOnce({});
-		await setBucketCors(makeClient(), 'bucket', [
+		await bucket.setCors(makeClient(), 'bucket', [
 			{
 				id: 'rule1',
 				allowedOrigins: ['http://localhost:5173'],
@@ -1670,7 +1627,7 @@ describe('setBucketCors', () => {
 describe('deleteBucketCors', () => {
 	it('sends DeleteBucketCorsCommand', async () => {
 		mockSend.mockResolvedValueOnce({});
-		await deleteBucketCors(makeClient(), 'bucket');
+		await bucket.deleteCors(makeClient(), 'bucket');
 		expect(mockSend).toHaveBeenCalledWith(expect.objectContaining({
 			_type: 'DeleteBucketCors'
 		}));
@@ -1678,7 +1635,7 @@ describe('deleteBucketCors', () => {
 
 	it('passes correct bucket name', async () => {
 		mockSend.mockResolvedValueOnce({});
-		await deleteBucketCors(makeClient(), 'my-bucket');
+		await bucket.deleteCors(makeClient(), 'my-bucket');
 		const call = mockSend.mock.calls[0][0];
 		expect(call.Bucket).toBe('my-bucket');
 	});

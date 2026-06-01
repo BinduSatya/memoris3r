@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createS3Client, copyObject, copyFolder, moveObject, moveFolder } from '$lib/server/s3';
+import { createS3Client, object } from '$lib/server/s3';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
@@ -22,19 +22,19 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		if (mode === 'copy') {
 			if (isFolder) {
-				const result = await copyFolder(client, sourceBucket, sourceKey, destBucket, destKey);
+				const result = await object.copyFolder(client, sourceBucket, sourceKey, destBucket, destKey);
 				return json({ success: true, copied: result.copied });
 			} else {
-				await copyObject(client, sourceBucket, sourceKey, destBucket, destKey);
+				await object.copy(client, sourceBucket, sourceKey, destBucket, destKey);
 				return json({ success: true });
 			}
 		} else {
 			// mode === 'move' or mode === 'rename' (rename is just move within same bucket)
 			if (isFolder) {
-				const result = await moveFolder(client, sourceBucket, sourceKey, destBucket, destKey);
+				const result = await object.moveFolder(client, sourceBucket, sourceKey, destBucket, destKey);
 				return json({ success: true, moved: result.moved });
 			} else {
-				await moveObject(client, sourceBucket, sourceKey, destBucket, destKey);
+				await object.move(client, sourceBucket, sourceKey, destBucket, destKey);
 				return json({ success: true });
 			}
 		}

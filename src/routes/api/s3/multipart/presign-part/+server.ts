@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createS3Client, getPresignedPartUrl } from '$lib/server/s3';
+import { createS3Client, object } from '$lib/server/s3';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
@@ -15,7 +15,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		}
 
 		const client = createS3Client(locals.credentials!);
-		const url = await getPresignedPartUrl(client, bucket, key, uploadId, partNumber);
+		const url = await object.getPartUrl(client, bucket, key, uploadId, partNumber);
 
 		return json({ url });
 	} catch (err: any) {

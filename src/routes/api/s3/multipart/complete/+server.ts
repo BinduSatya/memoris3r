@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createS3Client, completeMultipartUpload } from '$lib/server/s3';
+import { createS3Client, object } from '$lib/server/s3';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
@@ -15,7 +15,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		}
 
 		const client = createS3Client(locals.credentials!);
-		await completeMultipartUpload(client, bucket, key, uploadId, parts);
+		await object.completeMultipart(client, bucket, key, uploadId, parts);
 
 		return json({ success: true });
 	} catch (err: any) {

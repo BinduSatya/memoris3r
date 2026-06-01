@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createS3Client, getPresignedDownloadUrl } from '$lib/server/s3';
+import { createS3Client, object } from '$lib/server/s3';
 
 export const GET: RequestHandler = async ({ url, locals }) => {
 	try {
@@ -16,7 +16,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		const versionId = url.searchParams.get('versionId') || undefined;
 
 		const client = createS3Client(locals.credentials!);
-		const presignedUrl = await getPresignedDownloadUrl(client, bucket, key, 900, {
+		const presignedUrl = await object.getDownloadUrl(client, bucket, key, 900, {
 			preview,
 			filename,
 			versionId

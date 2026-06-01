@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createS3Client, restoreObjectVersion } from '$lib/server/s3';
+import { createS3Client, object } from '$lib/server/s3';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
@@ -15,7 +15,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		}
 
 		const client = createS3Client(locals.credentials!);
-		await restoreObjectVersion(client, bucket, key, versionId);
+		await object.restoreVersion(client, bucket, key, versionId);
 
 		return json({ success: true });
 	} catch (err: any) {

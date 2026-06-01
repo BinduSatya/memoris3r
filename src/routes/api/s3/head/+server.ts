@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createS3Client, headObject, getObjectTags } from '$lib/server/s3';
+import { createS3Client, object } from '$lib/server/s3';
 
 export const GET: RequestHandler = async ({ url, locals }) => {
 	try {
@@ -15,7 +15,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		const includeVersionId = url.searchParams.get('includeVersionId') === 'true';
 
 		const client = createS3Client(locals.credentials!);
-		const metadata = await headObject(client, bucket, key);
+		const metadata = await object.head(client, bucket, key);
 
 		const result: Record<string, unknown> = { ...metadata };
 
@@ -25,7 +25,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		}
 
 		if (includeTags) {
-			result.tags = await getObjectTags(client, bucket, key);
+			result.tags = await object.getTags(client, bucket, key);
 		}
 
 		return json(result);

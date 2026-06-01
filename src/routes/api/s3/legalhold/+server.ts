@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createS3Client, getObjectLegalHold, setObjectLegalHold } from '$lib/server/s3';
+import { createS3Client, object } from '$lib/server/s3';
 
 export const GET: RequestHandler = async ({ url, locals }) => {
 	try {
@@ -12,7 +12,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		}
 
 		const client = createS3Client(locals.credentials!);
-		const status = await getObjectLegalHold(client, bucket, key);
+		const status = await object.getLegalHold(client, bucket, key);
 
 		return json({ status });
 	} catch (err: any) {
@@ -35,7 +35,7 @@ export const PUT: RequestHandler = async ({ request, locals }) => {
 		}
 
 		const client = createS3Client(locals.credentials!);
-		await setObjectLegalHold(client, bucket, key, status);
+		await object.setLegalHold(client, bucket, key, status);
 
 		return json({ success: true });
 	} catch (err: any) {

@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createS3Client, searchObjects } from '$lib/server/s3';
+import { createS3Client, object } from '$lib/server/s3';
 
 export const GET: RequestHandler = async ({ url, locals }) => {
 	try {
@@ -17,7 +17,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		}
 
 		const client = createS3Client(locals.credentials!);
-		const result = await searchObjects(client, bucket, prefix, query, maxKeys);
+		const result = await object.search(client, bucket, prefix, query, maxKeys);
 		return json(result);
 	} catch (err: any) {
 		console.error('Search error:', err);

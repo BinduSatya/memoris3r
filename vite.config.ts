@@ -1,6 +1,6 @@
 import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 
 /**
  * Workaround for flowbite-svelte Arrow.svelte CSS incompatibility with Tailwind CSS v4.
@@ -21,6 +21,19 @@ function flowbiteArrowCssFix(): Plugin {
 	};
 }
 
-export default defineConfig({
-	plugins: [flowbiteArrowCssFix(), tailwindcss(), sveltekit()]
+export default defineConfig(({ mode }) => {
+	// Load .env / .env.local / .env.<mode> into process.env so the
+	// SvelteKit server runtime can read S3_* etc. via process.env.*.
+	// Vite normally only exposes VITE_-prefixed vars to client code;
+	// here we explicitly forward everything to the Node process.
+	const env = loadEnv(mode, process.cwd(), '');
+	for (const [key, value] of Object.entries(env)) {
+		if (process.env[key] === undefined) {
+			process.env[key] = value;
+		}
+	}
+
+	return {
+		plugins: [flowbiteArrowCssFix(), tailwindcss(), sveltekit()]
+	};
 });

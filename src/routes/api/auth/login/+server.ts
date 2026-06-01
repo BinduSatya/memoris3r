@@ -1,8 +1,8 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import type { S3Credentials } from '$lib/types';
-import { encryptSession, decryptSession } from '$lib/server/session';
-import { createS3Client, listBuckets } from '$lib/server/s3';
+import type { S3Credentials, BucketInfo } from '$lib/types';
+import { encryptSession } from '$lib/server/session';
+import { createS3Client, bucket as bucketApi } from '$lib/server/s3';
 
 export const POST: RequestHandler = async ({ request, cookies, locals }) => {
 	try {
@@ -21,9 +21,17 @@ export const POST: RequestHandler = async ({ request, cookies, locals }) => {
 			...(sessionToken && { sessionToken })
 		};
 
-		// Validate credentials by listing buckets
+		// Validate credentials. In single-bucket mode we HeadBucket on the
+		// configured bucket (no s3:ListAllMyBuckets permission required);
+		// otherwise we ListBuckets as before.
 		const client = createS3Client(credentials);
-		const buckets = await listBuckets(client);
+		let buckets: BucketInfo[];
+		if (locals.singleBucket) {
+			await bucketApi.head(client, locals.singleBucket);
+			buckets = [{ name: locals.singleBucket }];
+		} else {
+			buckets = await bucketApi.list(client);
+		}
 
 		// If user has an existing OIDC session (user identity in locals),
 		// merge the user identity with the new credentials
@@ -42,14 +50,25 @@ export const POST: RequestHandler = async ({ request, cookies, locals }) => {
 		return json({ success: true, buckets });
 	} catch (err: any) {
 		console.error('Login error:', err);
-		const message =
-			err.name === 'CredentialsError' ||
-			err.name === 'InvalidAccessKeyId' ||
-			err.Code === 'InvalidAccessKeyId' ||
-			err.name === 'SignatureDoesNotMatch' ||
-			err.Code === 'SignatureDoesNotMatch'
-				? 'Invalid credentials — check your access key and secret'
-				: 'Failed to connect to S3';
+		const code = err.name || err.Code || '';
+		let message: string;
+		if (
+			code === 'CredentialsError' ||
+			code === 'InvalidAccessKeyId' ||
+			code === 'SignatureDoesNotMatch'
+		) {
+			message = 'Invalid credentials — check your access key and secret';
+		} else if (code === 'NoSuchBucket' || code === 'NotFound') {
+			message = locals.singleBucket
+				? `Bucket "${locals.singleBucket}" does not exist or is not accessible with these credentials`
+				: 'Bucket not found';
+		} else if (code === 'AccessDenied' || code === 'Forbidden') {
+			message = locals.singleBucket
+				? `Access denied to bucket "${locals.singleBucket}" — verify the IAM policy allows s3:ListBucket on this bucket`
+				: 'Access denied — these credentials lack s3:ListAllMyBuckets permission. Set the S3_BUCKET env var to enable single-bucket mode.';
+		} else {
+			message = 'Failed to connect to S3';
+		}
 		return json({ error: message }, { status: 401 });
 	}
 };

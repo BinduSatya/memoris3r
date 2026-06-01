@@ -36,6 +36,7 @@ Copy [`.env.example`](.env.example) and adjust for your environment. Key variabl
 | `ORIGIN` | Public URL of the app. Must match for CSRF protection to work. |
 | `S3_DEFAULT_ENDPOINT` | Pre-fills the endpoint field on the login form. |
 | `S3_ACCESS_KEY` + `S3_SECRET_KEY` | Enables fixed credentials mode (skips login). |
+| `S3_BUCKET` | Restricts the app to a single bucket (skips `ListBuckets`). See below. |
 | `OIDC_ISSUER` + `OIDC_CLIENT_ID` + `OIDC_CLIENT_SECRET` | Enables SSO login via OpenID Connect. |
 
 ### Auth Modes
@@ -45,6 +46,54 @@ Copy [`.env.example`](.env.example) and adjust for your environment. Key variabl
 **Fixed credentials** — set `S3_ACCESS_KEY` and `S3_SECRET_KEY` env vars. Login is skipped; all users share the same S3 session. Only use behind a VPN or auth proxy.
 
 **OIDC / SSO** — set `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`. Works with Keycloak, Okta, Authentik, Azure AD, Google, etc. Callback URL: `https://<your-domain>/api/auth/oidc/callback`. Can be combined with fixed credentials (SSO gate + shared S3 access) or manual credentials (SSO gate + per-user S3 keys).
+
+### Single-Bucket Mode
+
+Set `S3_BUCKET=<name>` to scope the entire app to a single bucket. Required when your S3 credentials lack the `s3:ListAllMyBuckets` permission (the default for most production IAM users / Ceph / corporate MinIO).
+
+In this mode:
+
+- Login validates credentials with `HeadBucket` instead of `ListBuckets`.
+- The bucket sidebar shows only the configured bucket.
+- Create / delete bucket UI is hidden.
+- Server-side guard rejects any request that targets a different bucket (403).
+
+Works with all three auth modes. Example for your scenario (manual login against a Ceph/MinIO-style endpoint that only allows one bucket):
+
+```bash
+docker run -p 3000:3000 \
+  -e SESSION_SECRET=$(openssl rand -base64 48) \
+  -e ORIGIN=http://localhost:3000 \
+  -e S3_BUCKET=tnd-s3 \
+  -e S3_DEFAULT_ENDPOINT=http://10.196.165.254 \
+  ghcr.io/OWNER/s3-viewer:latest
+```
+
+Or fully unattended (single-bucket + fixed credentials):
+
+```bash
+docker run -p 3000:3000 \
+  -e SESSION_SECRET=$(openssl rand -base64 48) \
+  -e ORIGIN=http://localhost:3000 \
+  -e S3_ENDPOINT=http://10.196.165.254 \
+  -e S3_ACCESS_KEY=G6HUT7215QUOT98I9TWZ \
+  -e S3_SECRET_KEY=G4hys8R496vyu0_bc1BpqnAdP0_Oir4t1Ug6g2xb \
+  -e S3_BUCKET=tnd-s3 \
+  ghcr.io/OWNER/s3-viewer:latest
+```
+
+The minimum IAM policy required for single-bucket mode:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": ["s3:ListBucket", "s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+    "Resource": ["arn:aws:s3:::tnd-s3", "arn:aws:s3:::tnd-s3/*"]
+  }]
+}
+```
 
 ## Features
 

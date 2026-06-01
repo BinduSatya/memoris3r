@@ -1,11 +1,16 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createS3Client, listBuckets, createBucket, deleteBucket } from '$lib/server/s3';
+import { createS3Client, bucket as bucketApi } from '$lib/server/s3';
 
 export const GET: RequestHandler = async ({ locals }) => {
 	try {
+		// In single-bucket mode, skip ListBuckets entirely (the configured
+		// credentials likely lack s3:ListAllMyBuckets permission).
+		if (locals.singleBucket) {
+			return json({ buckets: [{ name: locals.singleBucket }] });
+		}
 		const client = createS3Client(locals.credentials!);
-		const buckets = await listBuckets(client);
+		const buckets = await bucketApi.list(client);
 		return json({ buckets });
 	} catch (err: any) {
 		console.error('List buckets error:', err);
@@ -17,6 +22,10 @@ const BUCKET_NAME_REGEX = /^[a-z0-9][a-z0-9.\-]{1,61}[a-z0-9]$/;
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
+		// Bucket creation is disabled in single-bucket mode.
+		if (locals.singleBucket) {
+			return json({ error: 'Bucket creation is disabled in single-bucket mode' }, { status: 403 });
+		}
 		const body = await request.json();
 		const { name, versioning, objectLocking } = body;
 
@@ -51,7 +60,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		}
 
 		const client = createS3Client(locals.credentials!);
-		await createBucket(client, name, { versioning, objectLocking });
+		await bucketApi.create(client, name, { versioning, objectLocking });
 
 		return json({ success: true, name });
 	} catch (err: any) {
@@ -62,6 +71,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 export const DELETE: RequestHandler = async ({ request, locals }) => {
 	try {
+		// Bucket deletion is disabled in single-bucket mode.
+		if (locals.singleBucket) {
+			return json({ error: 'Bucket deletion is disabled in single-bucket mode' }, { status: 403 });
+		}
 		const body = await request.json();
 		const { name } = body;
 
@@ -70,7 +83,7 @@ export const DELETE: RequestHandler = async ({ request, locals }) => {
 		}
 
 		const client = createS3Client(locals.credentials!);
-		await deleteBucket(client, name);
+		await bucketApi.delete(client, name);
 
 		return json({ success: true });
 	} catch (err: any) {

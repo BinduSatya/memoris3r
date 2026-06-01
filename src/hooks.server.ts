@@ -25,6 +25,17 @@ export function getFixedCredentials(): S3Credentials | null {
 	};
 }
 
+/**
+ * Returns the single allowed bucket name when single-bucket mode is active
+ * (S3_BUCKET env var is set). In this mode the app skips ListBuckets and
+ * scopes all operations to this one bucket — required for IAM users that
+ * lack s3:ListAllMyBuckets permission.
+ */
+export function getSingleBucket(): string | null {
+	const name = process.env.S3_BUCKET?.trim();
+	return name ? name : null;
+}
+
 const STATIC_SECURITY_HEADERS: Record<string, string> = {
 	'X-Frame-Options': 'DENY',
 	'X-Content-Type-Options': 'nosniff',
@@ -74,6 +85,65 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	const fixedCreds = getFixedCredentials();
+	const singleBucket = getSingleBucket();
+	if (singleBucket) {
+		event.locals.singleBucket = singleBucket;
+	}
+
+	// --- Enforce single-bucket scope on every S3 API call ---
+	// Prevents a curious user from probing other buckets via ?bucket=... params
+	// or JSON body fields once the operator has restricted the app to one bucket.
+	if (singleBucket && event.url.pathname.startsWith('/api/s3')) {
+		// Query-string check (covers GET ?bucket=...)
+		const requestedBucket = event.url.searchParams.get('bucket');
+		if (requestedBucket && requestedBucket !== singleBucket) {
+			return new Response(
+				JSON.stringify({ error: `Access denied — app is restricted to bucket "${singleBucket}"` }),
+				{ status: 403, headers: { 'Content-Type': 'application/json' } }
+			);
+		}
+
+		// JSON body check (covers POST/PUT/DELETE with { bucket: "..." })
+		// Reading the body consumes the stream, so we re-wrap the request
+		// with the parsed text so downstream handlers can read it again.
+		const method = event.request.method;
+		const contentType = event.request.headers.get('content-type') || '';
+		if (
+			(method === 'POST' || method === 'PUT' || method === 'DELETE') &&
+			contentType.includes('application/json')
+		) {
+			try {
+				const bodyText = await event.request.text();
+				if (bodyText) {
+					try {
+						const parsed = JSON.parse(bodyText);
+						if (
+							parsed &&
+							typeof parsed.bucket === 'string' &&
+							parsed.bucket !== singleBucket
+						) {
+							return new Response(
+								JSON.stringify({
+									error: `Access denied — app is restricted to bucket "${singleBucket}"`
+								}),
+								{ status: 403, headers: { 'Content-Type': 'application/json' } }
+							);
+						}
+					} catch {
+						// Not JSON we recognise — fall through and let the handler decide.
+					}
+				}
+				// Re-attach a fresh Request so downstream handlers can read the body.
+				event.request = new Request(event.request.url, {
+					method: event.request.method,
+					headers: event.request.headers,
+					body: bodyText || null
+				});
+			} catch {
+				// If we can't read the body for any reason, fall through.
+			}
+		}
+	}
 
 	// --- Fixed credentials mode ---
 	// When env vars are set, always use them for ALL routes.

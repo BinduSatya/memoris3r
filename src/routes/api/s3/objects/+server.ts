@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createS3Client, listObjects } from '$lib/server/s3';
+import { createS3Client, object } from '$lib/server/s3';
 
 export const GET: RequestHandler = async ({ url, locals }) => {
 	try {
@@ -14,7 +14,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		}
 
 		const client = createS3Client(locals.credentials!);
-		const result = await listObjects(client, bucket, prefix, continuationToken, maxKeys);
+		const result = await object.list(client, bucket, prefix, continuationToken, maxKeys);
 		return json(result);
 	} catch (err: any) {
 		console.error('List objects error:', err);

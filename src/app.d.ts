@@ -5,6 +5,8 @@ declare global {
 		interface Locals {
 			credentials?: S3Credentials;
 			user?: UserIdentity;
+			/** Name of the only bucket the app is allowed to access (S3_BUCKET env var). */
+			singleBucket?: string;
 		}
 		// interface Error {}
 		// interface PageData {}

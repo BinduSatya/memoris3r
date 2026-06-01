@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createS3Client, getBucketTags, setBucketTags, deleteBucketTags } from '$lib/server/s3';
+import { createS3Client, bucket as bucketApi } from '$lib/server/s3';
 
 export const GET: RequestHandler = async ({ url, locals }) => {
 	try {
@@ -11,7 +11,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		}
 
 		const client = createS3Client(locals.credentials!);
-		const tags = await getBucketTags(client, bucket);
+		const tags = await bucketApi.getTags(client, bucket);
 
 		return json({ tags });
 	} catch (err: any) {
@@ -46,7 +46,7 @@ export const PUT: RequestHandler = async ({ request, locals }) => {
 		}
 
 		const client = createS3Client(locals.credentials!);
-		await setBucketTags(client, bucket, tags);
+		await bucketApi.setTags(client, bucket, tags);
 
 		return json({ success: true });
 	} catch (err: any) {
@@ -64,7 +64,7 @@ export const DELETE: RequestHandler = async ({ url, locals }) => {
 		}
 
 		const client = createS3Client(locals.credentials!);
-		await deleteBucketTags(client, bucket);
+		await bucketApi.deleteTags(client, bucket);
 
 		return json({ success: true });
 	} catch (err: any) {

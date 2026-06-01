@@ -1,6 +1,7 @@
 import {
 	S3Client,
 	ListBucketsCommand,
+	HeadBucketCommand,
 	ListObjectsV2Command,
 	DeleteObjectCommand,
 	PutObjectCommand,
@@ -37,6 +38,8 @@ import {
 	type CreateBucketCommandInput
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { NodeHttpHandler } from '@smithy/node-http-handler';
+import https from 'node:https';
 import type {
 	S3Credentials,
 	S3Object,
@@ -47,6 +50,22 @@ import type {
 	ObjectVersion,
 	CorsRule
 } from '$lib/types';
+
+/**
+ * Lazily-created HTTPS agent that skips certificate verification.
+ * Activated by setting S3_INSECURE_TLS=true — useful for internal
+ * S3-compatible endpoints with self-signed or IP-SAN-less certificates.
+ * NEVER enable this against the public internet.
+ */
+let insecureHandler: NodeHttpHandler | null = null;
+function getInsecureHandler(): NodeHttpHandler {
+	if (!insecureHandler) {
+		insecureHandler = new NodeHttpHandler({
+			httpsAgent: new https.Agent({ rejectUnauthorized: false })
+		});
+	}
+	return insecureHandler;
+}
 
 export function createS3Client(credentials: S3Credentials): S3Client {
 	const config: Record<string, unknown> = {
@@ -63,10 +82,15 @@ export function createS3Client(credentials: S3Credentials): S3Client {
 		config.forcePathStyle = true; // Required for MinIO and most S3-compatible services
 	}
 
+	// Opt-in TLS-verification bypass for internal endpoints with self-signed certs.
+	if (process.env.S3_INSECURE_TLS === 'true' || process.env.S3_INSECURE_TLS === '1') {
+		config.requestHandler = getInsecureHandler();
+	}
+
 	return new S3Client(config);
 }
 
-export async function listBuckets(client: S3Client): Promise<BucketInfo[]> {
+async function listBuckets(client: S3Client): Promise<BucketInfo[]> {
 	const response = await client.send(new ListBucketsCommand({}));
 	return (response.Buckets || []).map((b) => ({
 		name: b.Name || '',
@@ -74,7 +98,16 @@ export async function listBuckets(client: S3Client): Promise<BucketInfo[]> {
 	}));
 }
 
-export async function listObjects(
+/**
+ * Verify that the credentials can access the named bucket.
+ * Used in single-bucket mode to validate login without requiring
+ * s3:ListAllMyBuckets permission.
+ */
+async function headBucket(client: S3Client, name: string): Promise<void> {
+	await client.send(new HeadBucketCommand({ Bucket: name }));
+}
+
+async function listObjects(
 	client: S3Client,
 	bucket: string,
 	prefix: string = '',
@@ -132,11 +165,11 @@ export async function listObjects(
 	};
 }
 
-export async function deleteObject(client: S3Client, bucket: string, key: string): Promise<void> {
+async function deleteObject(client: S3Client, bucket: string, key: string): Promise<void> {
 	await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
 }
 
-export async function deleteObjects(
+async function deleteObjects(
 	client: S3Client,
 	bucket: string,
 	keys: string[]
@@ -147,7 +180,7 @@ export async function deleteObjects(
 	}
 }
 
-export async function createFolder(
+async function createFolder(
 	client: S3Client,
 	bucket: string,
 	key: string
@@ -163,7 +196,7 @@ export async function createFolder(
 	);
 }
 
-export async function getPresignedDownloadUrl(
+async function getPresignedDownloadUrl(
 	client: S3Client,
 	bucket: string,
 	key: string,
@@ -183,7 +216,7 @@ export async function getPresignedDownloadUrl(
 	return getSignedUrl(client, command, { expiresIn });
 }
 
-export async function headObject(
+async function headObject(
 	client: S3Client,
 	bucket: string,
 	key: string
@@ -205,7 +238,7 @@ export async function headObject(
 	};
 }
 
-export async function getPresignedUploadUrl(
+async function getPresignedUploadUrl(
 	client: S3Client,
 	bucket: string,
 	key: string,
@@ -220,7 +253,7 @@ export async function getPresignedUploadUrl(
 	return getSignedUrl(client, command, { expiresIn });
 }
 
-export async function createBucket(
+async function createBucket(
 	client: S3Client,
 	name: string,
 	options?: { versioning?: boolean; objectLocking?: boolean }
@@ -244,11 +277,11 @@ export async function createBucket(
 	}
 }
 
-export async function deleteBucket(client: S3Client, name: string): Promise<void> {
+async function deleteBucket(client: S3Client, name: string): Promise<void> {
 	await client.send(new DeleteBucketCommand({ Bucket: name }));
 }
 
-export async function getBucketInfo(client: S3Client, name: string): Promise<BucketDetails> {
+async function getBucketInfo(client: S3Client, name: string): Promise<BucketDetails> {
 	// Get versioning status
 	const versioningResponse = await client.send(
 		new GetBucketVersioningCommand({ Bucket: name })
@@ -302,7 +335,7 @@ export async function getBucketInfo(client: S3Client, name: string): Promise<Buc
 	};
 }
 
-export async function listObjectVersions(
+async function listObjectVersions(
 	client: S3Client,
 	bucket: string,
 	prefix: string,
@@ -353,7 +386,7 @@ export async function listObjectVersions(
 	};
 }
 
-export async function restoreObjectVersion(
+async function restoreObjectVersion(
 	client: S3Client,
 	bucket: string,
 	key: string,
@@ -371,7 +404,7 @@ export async function restoreObjectVersion(
 	);
 }
 
-export async function deleteObjectVersion(
+async function deleteObjectVersion(
 	client: S3Client,
 	bucket: string,
 	key: string,
@@ -387,7 +420,7 @@ export async function deleteObjectVersion(
 }
 
 // Get a readable stream for an object (for piping into ZIP)
-export async function getObjectStream(
+async function getObjectStream(
 	client: S3Client,
 	bucket: string,
 	key: string
@@ -399,7 +432,7 @@ export async function getObjectStream(
 }
 
 // Get tags for an object
-export async function getObjectTags(
+async function getObjectTags(
 	client: S3Client,
 	bucket: string,
 	key: string
@@ -418,7 +451,7 @@ export async function getObjectTags(
 }
 
 // Set tags on an object
-export async function setObjectTags(
+async function setObjectTags(
 	client: S3Client,
 	bucket: string,
 	key: string,
@@ -437,7 +470,7 @@ export async function setObjectTags(
 
 // ── A10: Bucket Versioning ──────────────────────────────────────────────
 
-export async function getBucketVersioning(client: S3Client, bucket: string): Promise<string> {
+async function getBucketVersioning(client: S3Client, bucket: string): Promise<string> {
 	const response = await client.send(new GetBucketVersioningCommand({ Bucket: bucket }));
 	return response.Status === 'Enabled'
 		? 'Enabled'
@@ -446,7 +479,7 @@ export async function getBucketVersioning(client: S3Client, bucket: string): Pro
 			: 'Disabled';
 }
 
-export async function setBucketVersioning(
+async function setBucketVersioning(
 	client: S3Client,
 	bucket: string,
 	enabled: boolean
@@ -461,7 +494,7 @@ export async function setBucketVersioning(
 
 // ── A11: Bucket Tags ────────────────────────────────────────────────────
 
-export async function getBucketTags(
+async function getBucketTags(
 	client: S3Client,
 	bucket: string
 ): Promise<Record<string, string>> {
@@ -482,7 +515,7 @@ export async function getBucketTags(
 	}
 }
 
-export async function setBucketTags(
+async function setBucketTags(
 	client: S3Client,
 	bucket: string,
 	tags: Record<string, string>
@@ -496,13 +529,13 @@ export async function setBucketTags(
 	);
 }
 
-export async function deleteBucketTags(client: S3Client, bucket: string): Promise<void> {
+async function deleteBucketTags(client: S3Client, bucket: string): Promise<void> {
 	await client.send(new DeleteBucketTaggingCommand({ Bucket: bucket }));
 }
 
 // ── A12: Bucket Policy ──────────────────────────────────────────────────
 
-export async function getBucketPolicy(
+async function getBucketPolicy(
 	client: S3Client,
 	bucket: string
 ): Promise<string | null> {
@@ -520,7 +553,7 @@ export async function getBucketPolicy(
 	}
 }
 
-export async function setBucketPolicy(
+async function setBucketPolicy(
 	client: S3Client,
 	bucket: string,
 	policy: string
@@ -533,13 +566,13 @@ export async function setBucketPolicy(
 	);
 }
 
-export async function deleteBucketPolicy(client: S3Client, bucket: string): Promise<void> {
+async function deleteBucketPolicy(client: S3Client, bucket: string): Promise<void> {
 	await client.send(new DeleteBucketPolicyCommand({ Bucket: bucket }));
 }
 
 // ── A14: Object Legal Hold ──────────────────────────────────────────────
 
-export async function getObjectLegalHold(
+async function getObjectLegalHold(
 	client: S3Client,
 	bucket: string,
 	key: string
@@ -550,7 +583,7 @@ export async function getObjectLegalHold(
 	return response.LegalHold?.Status || 'OFF';
 }
 
-export async function setObjectLegalHold(
+async function setObjectLegalHold(
 	client: S3Client,
 	bucket: string,
 	key: string,
@@ -567,7 +600,7 @@ export async function setObjectLegalHold(
 
 // ── A15: Object Retention ───────────────────────────────────────────────
 
-export async function getObjectRetention(
+async function getObjectRetention(
 	client: S3Client,
 	bucket: string,
 	key: string
@@ -593,7 +626,7 @@ export async function getObjectRetention(
 	}
 }
 
-export async function setObjectRetention(
+async function setObjectRetention(
 	client: S3Client,
 	bucket: string,
 	key: string,
@@ -616,7 +649,7 @@ export async function setObjectRetention(
 
 // ── A16: Bucket Retention Policy ────────────────────────────────────────
 
-export async function getBucketRetention(
+async function getBucketRetention(
 	client: S3Client,
 	bucket: string
 ): Promise<{ enabled: boolean; mode?: string; days?: number; years?: number }> {
@@ -651,7 +684,7 @@ export async function getBucketRetention(
 	}
 }
 
-export async function setBucketRetention(
+async function setBucketRetention(
 	client: S3Client,
 	bucket: string,
 	mode: string,
@@ -677,7 +710,7 @@ export async function setBucketRetention(
 
 // ── Copy / Move / Rename ────────────────────────────────────────────────
 
-export async function copyObject(
+async function copyObject(
 	client: S3Client,
 	sourceBucket: string,
 	sourceKey: string,
@@ -694,7 +727,7 @@ export async function copyObject(
 	);
 }
 
-export async function copyFolder(
+async function copyFolder(
 	client: S3Client,
 	sourceBucket: string,
 	sourcePrefix: string,
@@ -729,7 +762,7 @@ export async function copyFolder(
 	return { copied };
 }
 
-export async function moveObject(
+async function moveObject(
 	client: S3Client,
 	sourceBucket: string,
 	sourceKey: string,
@@ -740,7 +773,7 @@ export async function moveObject(
 	await deleteObject(client, sourceBucket, sourceKey);
 }
 
-export async function moveFolder(
+async function moveFolder(
 	client: S3Client,
 	sourceBucket: string,
 	sourcePrefix: string,
@@ -772,7 +805,7 @@ export async function moveFolder(
 	return { moved: copied };
 }
 
-export async function searchObjects(
+async function searchObjects(
 	client: S3Client,
 	bucket: string,
 	prefix: string,
@@ -830,7 +863,7 @@ export async function searchObjects(
 // ── Multipart Upload ────────────────────────────────────────────────────
 
 /** Initiate a multipart upload — returns uploadId */
-export async function initiateMultipartUpload(
+async function initiateMultipartUpload(
 	client: S3Client,
 	bucket: string,
 	key: string,
@@ -846,7 +879,7 @@ export async function initiateMultipartUpload(
 }
 
 /** Generate a presigned URL for uploading a single part */
-export async function getPresignedPartUrl(
+async function getPresignedPartUrl(
 	client: S3Client,
 	bucket: string,
 	key: string,
@@ -864,7 +897,7 @@ export async function getPresignedPartUrl(
 }
 
 /** Complete a multipart upload with the list of parts */
-export async function completeMultipartUpload(
+async function completeMultipartUpload(
 	client: S3Client,
 	bucket: string,
 	key: string,
@@ -883,7 +916,7 @@ export async function completeMultipartUpload(
 }
 
 /** Abort a multipart upload */
-export async function abortMultipartUpload(
+async function abortMultipartUpload(
 	client: S3Client,
 	bucket: string,
 	key: string,
@@ -898,7 +931,7 @@ export async function abortMultipartUpload(
 }
 
 /** List already-uploaded parts (for resume support) */
-export async function listUploadParts(
+async function listUploadParts(
 	client: S3Client,
 	bucket: string,
 	key: string,
@@ -919,7 +952,7 @@ export async function listUploadParts(
 
 // ── P3.3: Bucket CORS ──────────────────────────────────────────────────
 
-export async function getBucketCors(
+async function getBucketCors(
 	client: S3Client,
 	bucket: string
 ): Promise<CorsRule[]> {
@@ -943,7 +976,7 @@ export async function getBucketCors(
 	}
 }
 
-export async function setBucketCors(
+async function setBucketCors(
 	client: S3Client,
 	bucket: string,
 	rules: CorsRule[]
@@ -964,10 +997,61 @@ export async function setBucketCors(
 	await client.send(cmd);
 }
 
-export async function deleteBucketCors(
+async function deleteBucketCors(
 	client: S3Client,
 	bucket: string
 ): Promise<void> {
 	const cmd = new DeleteBucketCorsCommand({ Bucket: bucket });
 	await client.send(cmd);
 }
+
+export const object = {
+	list: listObjects,
+	delete: deleteObject,
+	deleteMany: deleteObjects,
+	createFolder,
+	head: headObject,
+	getStream: getObjectStream,
+	getTags: getObjectTags,
+	setTags: setObjectTags,
+	getDownloadUrl: getPresignedDownloadUrl,
+	getUploadUrl: getPresignedUploadUrl,
+	listVersions: listObjectVersions,
+	restoreVersion: restoreObjectVersion,
+	deleteVersion: deleteObjectVersion,
+	getLegalHold: getObjectLegalHold,
+	setLegalHold: setObjectLegalHold,
+	getRetention: getObjectRetention,
+	setRetention: setObjectRetention,
+	copy: copyObject,
+	copyFolder,
+	move: moveObject,
+	moveFolder,
+	search: searchObjects,
+	initiateMultipart: initiateMultipartUpload,
+	getPartUrl: getPresignedPartUrl,
+	completeMultipart: completeMultipartUpload,
+	abortMultipart: abortMultipartUpload,
+	listParts: listUploadParts
+};
+
+export const bucket = {
+	list: listBuckets,
+	head: headBucket,
+	create: createBucket,
+	delete: deleteBucket,
+	getInfo: getBucketInfo,
+	getVersioning: getBucketVersioning,
+	setVersioning: setBucketVersioning,
+	getTags: getBucketTags,
+	setTags: setBucketTags,
+	deleteTags: deleteBucketTags,
+	getPolicy: getBucketPolicy,
+	setPolicy: setBucketPolicy,
+	deletePolicy: deleteBucketPolicy,
+	getRetention: getBucketRetention,
+	setRetention: setBucketRetention,
+	getCors: getBucketCors,
+	setCors: setBucketCors,
+	deleteCors: deleteBucketCors
+};

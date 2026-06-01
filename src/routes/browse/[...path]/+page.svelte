@@ -105,6 +105,8 @@
   let authMode = $state<'manual' | 'fixed' | 'oidc'>('manual');
   let userEmail = $state('');
   let userName = $state('');
+  // Single-bucket mode (S3_BUCKET env var set on the server)
+  let singleBucket = $state<string | null>(null);
 
   // GlobalHeader ref for search focus
   let globalHeaderRef: ReturnType<typeof GlobalHeader> | undefined = $state();
@@ -192,6 +194,9 @@
           userEmail = sessionData.user.email || '';
           userName = sessionData.user.name || '';
         }
+        if (sessionData.singleBucket) {
+          singleBucket = sessionData.singleBucket;
+        }
       } catch {
         // Non-critical — default to manual
       }
@@ -201,6 +206,13 @@
       const data = await res.json();
       buckets = data.buckets || [];
       parsePathFromUrl();
+      // In single-bucket mode, auto-select the bucket if no path was provided
+      if (!activeBucket && singleBucket) {
+        activeBucket = singleBucket;
+        currentPrefix = '';
+        // Update URL silently so deep-linking and breadcrumbs work
+        goto(`/browse/${singleBucket}`, { replaceState: true });
+      }
       if (activeBucket) await loadObjects();
     } catch { goto('/'); }
     finally { loadingBuckets = false; }
@@ -1106,8 +1118,8 @@
       onselectbucket={selectBucket}
       onnavigate={handleSidebarNavigate}
       bind:mobileOpen={sidebarOpen}
-      oncreatebucket={() => { createBucketOpen = true; }}
-      ondeletebucket={openDeleteBucket}
+      oncreatebucket={singleBucket ? undefined : () => { createBucketOpen = true; }}
+      ondeletebucket={singleBucket ? undefined : openDeleteBucket}
       onopenbookmarks={() => { bookmarksPanelOpen = true; }}
     />
 
