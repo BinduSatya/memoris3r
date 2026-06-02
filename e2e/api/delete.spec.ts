@@ -59,6 +59,44 @@ test.describe('API: Delete', () => {
 		expect(body.deleted).toBe(3);
 	});
 
+	test('delete folder removes all contained objects recursively', async ({ authedRequest }) => {
+		// Create a folder with nested objects (including a deeper subfolder)
+		const folder = `e2e-delete-folder-${Date.now()}/`;
+		const contained = [
+			`${folder}a.txt`,
+			`${folder}b.txt`,
+			`${folder}sub/c.txt`
+		];
+
+		for (const key of contained) {
+			const presignRes = await authedRequest.post('/api/s3/upload', {
+				data: { bucket: BUCKETS.test, key, contentType: 'text/plain' }
+			});
+			const { url } = await presignRes.json();
+			await authedRequest.put(url, {
+				data: 'delete me',
+				headers: { 'Content-Type': 'text/plain' }
+			});
+		}
+
+		// Delete the folder by its prefix key
+		const deleteRes = await authedRequest.post('/api/s3/delete', {
+			data: { bucket: BUCKETS.test, keys: [folder] }
+		});
+		expect(deleteRes.status()).toBe(200);
+		const body = await deleteRes.json();
+		expect(body.success).toBe(true);
+		// Count reflects every object removed, not the single selected folder
+		expect(body.deleted).toBe(contained.length);
+
+		// Verify the folder is empty — listing the prefix returns no objects
+		const listRes = await authedRequest.get(
+			`/api/s3/objects?bucket=${BUCKETS.test}&prefix=${encodeURIComponent(folder)}`
+		);
+		const listing = await listRes.json();
+		expect(listing.objects).toHaveLength(0);
+	});
+
 	test('missing or empty keys array returns 400', async ({ authedRequest }) => {
 		const res1 = await authedRequest.post('/api/s3/delete', {
 			data: { bucket: BUCKETS.test }

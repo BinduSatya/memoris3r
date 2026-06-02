@@ -74,7 +74,16 @@ export function createS3Client(credentials: S3Credentials): S3Client {
 			accessKeyId: credentials.accessKeyId,
 			secretAccessKey: credentials.secretAccessKey,
 			...(credentials.sessionToken && { sessionToken: credentials.sessionToken })
-		}
+		},
+		// AWS SDK v3 (>=3.729) adds a CRC32 checksum to requests by default. When we
+		// presign PutObject/UploadPart, that checksum is computed over an EMPTY body
+		// and baked into the URL — so when the browser PUTs the real file, strict
+		// S3-compatible backends (AWS S3, Ceph/RGW, Backblaze B2, DigitalOcean
+		// Spaces) reject it (checksum mismatch / unsupported x-amz-checksum-* params)
+		// and the upload fails. WHEN_REQUIRED only adds checksums where the operation
+		// mandates them, keeping presigned upload URLs clean.
+		requestChecksumCalculation: 'WHEN_REQUIRED',
+		responseChecksumValidation: 'WHEN_REQUIRED'
 	};
 
 	if (credentials.endpoint) {
@@ -178,6 +187,46 @@ async function deleteObjects(
 	for (const key of keys) {
 		await deleteObject(client, bucket, key);
 	}
+}
+
+/**
+ * Recursively delete a "folder": every object whose key starts with the
+ * given prefix, including the zero-byte folder marker itself. S3 has no real
+ * folders, so deleting the prefix marker alone would orphan the contents and
+ * the folder would reappear on the next listing. Paginated to handle folders
+ * with more than 1000 objects.
+ */
+async function deleteFolder(
+	client: S3Client,
+	bucket: string,
+	prefix: string
+): Promise<{ deleted: number }> {
+	// Normalize to a trailing-slash prefix so we only match inside this folder
+	// (e.g. "docs" must not also match "docs-archive/...").
+	const folderPrefix = prefix.endsWith('/') ? prefix : `${prefix}/`;
+	let deleted = 0;
+	let continuationToken: string | undefined;
+
+	do {
+		const response = await client.send(
+			new ListObjectsV2Command({
+				Bucket: bucket,
+				Prefix: folderPrefix,
+				ContinuationToken: continuationToken
+				// No Delimiter — recurse into nested folders
+			})
+		);
+
+		for (const obj of response.Contents || []) {
+			if (!obj.Key) continue;
+			await deleteObject(client, bucket, obj.Key);
+			deleted++;
+		}
+
+		continuationToken = response.NextContinuationToken;
+	} while (continuationToken);
+
+	return { deleted };
 }
 
 async function createFolder(
@@ -1009,6 +1058,7 @@ export const object = {
 	list: listObjects,
 	delete: deleteObject,
 	deleteMany: deleteObjects,
+	deleteFolder,
 	createFolder,
 	head: headObject,
 	getStream: getObjectStream,

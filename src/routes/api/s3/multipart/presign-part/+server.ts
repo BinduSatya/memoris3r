@@ -1,11 +1,18 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { createS3Client, object } from '$lib/server/s3';
+import { s3ErrorDetail } from '$lib/server/errors';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
+	let bucket: string | undefined;
+	let key: string | undefined;
+	let partNumber: number | undefined;
 	try {
 		const body = await request.json();
-		const { bucket, key, uploadId, partNumber } = body;
+		bucket = body.bucket;
+		key = body.key;
+		partNumber = body.partNumber;
+		const uploadId = body.uploadId;
 
 		if (!bucket || !key || !uploadId || !partNumber) {
 			return json(
@@ -19,7 +26,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		return json({ url });
 	} catch (err: any) {
-		console.error('Presign part error:', err);
-		return json({ error: 'Failed to generate presigned part URL' }, { status: 500 });
+		console.error(`Presign part error for ${bucket ?? '?'}/${key ?? '?'} part ${partNumber ?? '?'}:`, err);
+		return json(
+			{ error: 'Failed to generate upload URL for part', detail: s3ErrorDetail(err) },
+			{ status: 500 }
+		);
 	}
 };

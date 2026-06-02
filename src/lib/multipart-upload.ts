@@ -1,3 +1,5 @@
+import { describePutFailure, readApiError } from './upload-errors';
+
 export interface MultipartUploadOptions {
 	file: File;
 	bucket: string;
@@ -74,7 +76,8 @@ export async function performMultipartUpload(options: MultipartUploadOptions): P
 					contentType: file.type || 'application/octet-stream'
 				})
 			});
-			if (!initRes.ok) throw new Error('Failed to initiate multipart upload');
+			if (!initRes.ok)
+				throw new Error(await readApiError(initRes, 'Failed to initiate multipart upload'));
 			const initData = await initRes.json();
 			uploadId = initData.uploadId;
 		}
@@ -108,7 +111,9 @@ export async function performMultipartUpload(options: MultipartUploadOptions): P
 				body: JSON.stringify({ bucket, key, uploadId, partNumber })
 			});
 			if (!presignRes.ok)
-				throw new Error(`Failed to get presigned URL for part ${partNumber}`);
+				throw new Error(
+					await readApiError(presignRes, `Failed to get upload URL for part ${partNumber}`)
+				);
 			const { url } = await presignRes.json();
 
 			// Slice the file chunk
@@ -175,7 +180,8 @@ export async function performMultipartUpload(options: MultipartUploadOptions): P
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ bucket, key, uploadId, parts: completedParts })
 		});
-		if (!completeRes.ok) throw new Error('Failed to complete multipart upload');
+		if (!completeRes.ok)
+			throw new Error(await readApiError(completeRes, 'Failed to complete multipart upload'));
 
 		// 5. Clean up resume state
 		clearResumeState(bucket, key);
@@ -220,11 +226,11 @@ function uploadChunkWithProgress(
 				const etag = xhr.getResponseHeader('ETag') || '';
 				resolve(etag.replace(/"/g, ''));
 			} else {
-				reject(new Error(`Upload failed with status ${xhr.status}`));
+				reject(new Error(describePutFailure(xhr, url)));
 			}
 		};
 
-		xhr.onerror = () => reject(new Error('Upload failed'));
+		xhr.onerror = () => reject(new Error(describePutFailure(xhr, url)));
 		xhr.send(chunk);
 	});
 }

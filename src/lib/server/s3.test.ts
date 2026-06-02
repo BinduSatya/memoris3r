@@ -136,6 +136,22 @@ describe('createS3Client', () => {
 		const config = lastConstructorConfig();
 		expect(config.region).toBe('us-east-1');
 	});
+
+	it('disables default request checksums so presigned PUT URLs work on strict S3-compatible backends', () => {
+		// AWS SDK v3 (>=3.729) injects a CRC32 checksum by default. For presigned
+		// PutObject/UploadPart URLs the checksum is computed over an empty body and
+		// baked into the URL, which breaks real uploads on AWS S3, Ceph/RGW, B2,
+		// and DigitalOcean Spaces. Must be WHEN_REQUIRED, not the default.
+		createS3Client({
+			accessKeyId: 'test-key',
+			secretAccessKey: 'test-secret',
+			region: 'us-east-1'
+		});
+
+		const config = lastConstructorConfig();
+		expect(config.requestChecksumCalculation).toBe('WHEN_REQUIRED');
+		expect(config.responseChecksumValidation).toBe('WHEN_REQUIRED');
+	});
 });
 
 // ── listBuckets ─────────────────────────────────────────────────────────
@@ -342,6 +358,70 @@ describe('deleteObjects', () => {
 		await object.deleteMany(makeClient(), 'bucket', ['file1.txt', 'file2.txt', 'file3.txt']);
 
 		expect(mockSend).toHaveBeenCalledTimes(3);
+	});
+});
+
+describe('deleteFolder', () => {
+	it('lists and deletes every object under the prefix (including the marker)', async () => {
+		// ListObjectsV2 returns the folder marker plus contents
+		mockSend.mockResolvedValueOnce({
+			Contents: [
+				{ Key: 'docs/' },
+				{ Key: 'docs/a.txt' },
+				{ Key: 'docs/sub/b.txt' }
+			],
+			NextContinuationToken: undefined
+		});
+		// Three DeleteObject calls
+		mockSend.mockResolvedValue({});
+
+		const result = await object.deleteFolder(makeClient(), 'bucket', 'docs/');
+
+		expect(result.deleted).toBe(3);
+		// Recursive listing scoped to the folder prefix (no delimiter → recurses)
+		const listCall = mockSend.mock.calls.find((c: any) => c[0]?._type === 'ListObjectsV2')?.[0];
+		expect(listCall.Prefix).toBe('docs/');
+		expect(listCall.Delimiter).toBeUndefined();
+		expect(mockSend).toHaveBeenCalledWith(
+			expect.objectContaining({ _type: 'DeleteObject', Bucket: 'bucket', Key: 'docs/sub/b.txt' })
+		);
+		expect(mockSend).toHaveBeenCalledWith(
+			expect.objectContaining({ _type: 'DeleteObject', Bucket: 'bucket', Key: 'docs/sub/b.txt' })
+		);
+	});
+
+	it('normalizes a prefix without a trailing slash', async () => {
+		mockSend.mockResolvedValueOnce({ Contents: [{ Key: 'docs/a.txt' }], NextContinuationToken: undefined });
+		mockSend.mockResolvedValue({});
+
+		await object.deleteFolder(makeClient(), 'bucket', 'docs');
+
+		expect(mockSend).toHaveBeenCalledWith(
+			expect.objectContaining({ _type: 'ListObjectsV2', Prefix: 'docs/' })
+		);
+	});
+
+	it('paginates through continuation tokens', async () => {
+		mockSend.mockResolvedValueOnce({
+			Contents: [{ Key: 'big/1.txt' }],
+			NextContinuationToken: 'token-1'
+		});
+		mockSend.mockResolvedValueOnce({}); // delete 1.txt
+		mockSend.mockResolvedValueOnce({
+			Contents: [{ Key: 'big/2.txt' }],
+			NextContinuationToken: undefined
+		});
+		mockSend.mockResolvedValueOnce({}); // delete 2.txt
+
+		const result = await object.deleteFolder(makeClient(), 'bucket', 'big/');
+		expect(result.deleted).toBe(2);
+	});
+
+	it('handles an empty folder', async () => {
+		mockSend.mockResolvedValueOnce({ Contents: [], NextContinuationToken: undefined });
+
+		const result = await object.deleteFolder(makeClient(), 'bucket', 'empty/');
+		expect(result.deleted).toBe(0);
 	});
 });
 
