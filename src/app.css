@@ -1,5 +1,12 @@
 @import 'tailwindcss';
 
+/* Tailwind v4 ignores node_modules during automatic content detection, so the
+   utility classes baked into flowbite-svelte's components (e.g. `sr-only` for
+   the modal close-button label, close-button sizing) are never generated.
+   Without this, the modal "Close" label renders as visible oversized text and
+   the X loses its layout. Scan the library so its classes are emitted. */
+@source '../node_modules/flowbite-svelte/dist';
+
 @custom-variant dark (&:is(.dark *));
 
 @theme {
