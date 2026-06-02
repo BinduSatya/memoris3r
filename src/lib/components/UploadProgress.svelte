@@ -5,6 +5,7 @@
     name: string;
     status: 'pending' | 'uploading' | 'done' | 'error';
     progress?: number;
+    error?: string;
   }
 
   let {
@@ -34,6 +35,10 @@
   let allDone = $derived(totalFiles > 0 && !isUploading);
   let hasErrors = $derived(errorFiles > 0);
   let allSuccess = $derived(allDone && !hasErrors);
+  // Surface the actual reason — distinct messages get listed, not just a count.
+  let errorMessages = $derived([
+    ...new Set(files.filter((f) => f.status === 'error' && f.error).map((f) => f.error as string)),
+  ]);
 
   // Overall progress percentage
   let overallProgress = $derived(() => {
@@ -136,33 +141,42 @@
       </div>
     {:else if hasErrors}
       <!-- Error state -->
-      <div class="flex items-center gap-4 px-5 py-3">
-        <!-- Error icon in red tinted circle -->
-        <div class="bg-red-50 dark:bg-red-900/20 p-2 rounded-full flex-shrink-0">
-          <svg class="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-          </svg>
+      <div class="px-5 py-3">
+        <div class="flex items-center gap-4">
+          <!-- Error icon in red tinted circle -->
+          <div class="bg-red-50 dark:bg-red-900/20 p-2 rounded-full flex-shrink-0">
+            <svg class="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0 flex flex-col">
+            <span class="text-sm font-bold text-gray-900 dark:text-white">Upload failed</span>
+            <span class="text-[11px] text-gray-500 dark:text-gray-400">
+              {errorFiles} file{errorFiles !== 1 ? 's' : ''} failed{doneFiles > 0 ? `, ${doneFiles} succeeded` : ''}
+            </span>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <button
+              onclick={handleRetry}
+              class="text-red-600 dark:text-red-400 text-[12px] font-bold hover:bg-red-50 dark:hover:bg-red-900/20 px-3 py-1.5 rounded transition-colors"
+            >
+              Retry
+            </button>
+            <button
+              onclick={dismiss}
+              class="text-gray-500 dark:text-gray-400 text-[12px] font-medium hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-1.5 rounded transition-colors"
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
-        <div class="flex-1 min-w-0 flex flex-col">
-          <span class="text-sm font-bold text-gray-900 dark:text-white">Upload failed</span>
-          <span class="text-[11px] text-gray-500 dark:text-gray-400">
-            {errorFiles} file{errorFiles !== 1 ? 's' : ''} failed{doneFiles > 0 ? `, ${doneFiles} succeeded` : ''}
-          </span>
-        </div>
-        <div class="flex items-center gap-2 flex-shrink-0">
-          <button
-            onclick={handleRetry}
-            class="text-red-600 dark:text-red-400 text-[12px] font-bold hover:bg-red-50 dark:hover:bg-red-900/20 px-3 py-1.5 rounded transition-colors"
-          >
-            Retry
-          </button>
-          <button
-            onclick={dismiss}
-            class="text-gray-500 dark:text-gray-400 text-[12px] font-medium hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-1.5 rounded transition-colors"
-          >
-            Dismiss
-          </button>
-        </div>
+        {#if errorMessages.length > 0}
+          <div class="mt-2 max-h-32 overflow-y-auto rounded-md bg-red-50 dark:bg-red-900/20 px-3 py-2">
+            {#each errorMessages as msg}
+              <p class="text-[11px] leading-snug text-red-700 dark:text-red-300 break-words">{msg}</p>
+            {/each}
+          </div>
+        {/if}
       </div>
     {/if}
   </div>

@@ -26,6 +26,7 @@
   import Spinner from '$lib/components/Spinner.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { performMultipartUpload, shouldUseMultipart } from '$lib/multipart-upload';
+  import { describePutFailure, readApiError } from '$lib/upload-errors';
   import { addTransfer, updateTransfer } from '$lib/stores/transfers.svelte';
   import { getBookmarks, getRecentItems, addRecentItem } from '$lib/stores/bookmarks.svelte';
 
@@ -604,8 +605,7 @@
           });
 
           if (!res.ok) {
-            const data = await res.json();
-            throw new Error(data.error || 'Failed to get upload URL');
+            throw new Error(await readApiError(res, 'Failed to get upload URL'));
           }
 
           const { url } = await res.json();
@@ -645,11 +645,11 @@
               if (xhr.status >= 200 && xhr.status < 300) {
                 resolve();
               } else {
-                reject(new Error(`Upload failed: ${xhr.statusText}`));
+                reject(new Error(describePutFailure(xhr, url)));
               }
             };
 
-            xhr.onerror = () => reject(new Error('Network error during upload'));
+            xhr.onerror = () => reject(new Error(describePutFailure(xhr, url)));
             xhr.send(file);
           });
         }
@@ -666,12 +666,14 @@
           completedAt: Date.now(),
         });
       } catch (err: any) {
+        const cancelled = err.message === 'Upload cancelled';
         uploadProgressFiles = uploadProgressFiles.map((f, idx) =>
-          idx === i ? { ...f, status: 'error' as const, progress: 0 } : f
+          idx === i ? { ...f, status: 'error' as const, progress: 0, error: cancelled ? undefined : err.message } : f
         );
-        if (err.message === 'Upload cancelled') {
+        if (cancelled) {
           updateTransfer(transferId, { status: 'cancelled' });
         } else {
+          console.error(`Upload failed for ${uploadProgressBucket}/${key}:`, err);
           updateTransfer(transferId, { status: 'failed', error: err.message });
         }
       }
@@ -764,8 +766,7 @@
           });
 
           if (!res.ok) {
-            const data = await res.json();
-            throw new Error(data.error || 'Failed to get upload URL');
+            throw new Error(await readApiError(res, 'Failed to get upload URL'));
           }
 
           const { url } = await res.json();
@@ -801,10 +802,10 @@
 
             xhr.onload = () => {
               if (xhr.status >= 200 && xhr.status < 300) resolve();
-              else reject(new Error(`Upload failed: ${xhr.statusText}`));
+              else reject(new Error(describePutFailure(xhr, url)));
             };
 
-            xhr.onerror = () => reject(new Error('Network error during upload'));
+            xhr.onerror = () => reject(new Error(describePutFailure(xhr, url)));
             xhr.send(file);
           });
         }
@@ -820,12 +821,14 @@
           completedAt: Date.now(),
         });
       } catch (err: any) {
+        const cancelled = err.message === 'Upload cancelled';
         uploadProgressFiles = uploadProgressFiles.map((f, idx) =>
-          idx === i ? { ...f, status: 'error' as const, progress: 0 } : f
+          idx === i ? { ...f, status: 'error' as const, progress: 0, error: cancelled ? undefined : err.message } : f
         );
-        if (err.message === 'Upload cancelled') {
+        if (cancelled) {
           updateTransfer(transferId, { status: 'cancelled' });
         } else {
+          console.error(`Upload retry failed for ${uploadProgressBucket}/${key}:`, err);
           updateTransfer(transferId, { status: 'failed', error: err.message });
         }
       }
