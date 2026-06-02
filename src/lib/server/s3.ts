@@ -74,7 +74,16 @@ export function createS3Client(credentials: S3Credentials): S3Client {
 			accessKeyId: credentials.accessKeyId,
 			secretAccessKey: credentials.secretAccessKey,
 			...(credentials.sessionToken && { sessionToken: credentials.sessionToken })
-		}
+		},
+		// AWS SDK v3 (>=3.729) adds a CRC32 checksum to requests by default. When we
+		// presign PutObject/UploadPart, that checksum is computed over an EMPTY body
+		// and baked into the URL — so when the browser PUTs the real file, strict
+		// S3-compatible backends (AWS S3, Ceph/RGW, Backblaze B2, DigitalOcean
+		// Spaces) reject it (checksum mismatch / unsupported x-amz-checksum-* params)
+		// and the upload fails. WHEN_REQUIRED only adds checksums where the operation
+		// mandates them, keeping presigned upload URLs clean.
+		requestChecksumCalculation: 'WHEN_REQUIRED',
+		responseChecksumValidation: 'WHEN_REQUIRED'
 	};
 
 	if (credentials.endpoint) {

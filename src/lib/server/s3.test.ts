@@ -136,6 +136,22 @@ describe('createS3Client', () => {
 		const config = lastConstructorConfig();
 		expect(config.region).toBe('us-east-1');
 	});
+
+	it('disables default request checksums so presigned PUT URLs work on strict S3-compatible backends', () => {
+		// AWS SDK v3 (>=3.729) injects a CRC32 checksum by default. For presigned
+		// PutObject/UploadPart URLs the checksum is computed over an empty body and
+		// baked into the URL, which breaks real uploads on AWS S3, Ceph/RGW, B2,
+		// and DigitalOcean Spaces. Must be WHEN_REQUIRED, not the default.
+		createS3Client({
+			accessKeyId: 'test-key',
+			secretAccessKey: 'test-secret',
+			region: 'us-east-1'
+		});
+
+		const config = lastConstructorConfig();
+		expect(config.requestChecksumCalculation).toBe('WHEN_REQUIRED');
+		expect(config.responseChecksumValidation).toBe('WHEN_REQUIRED');
+	});
 });
 
 // ── listBuckets ─────────────────────────────────────────────────────────
