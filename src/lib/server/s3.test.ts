@@ -345,6 +345,70 @@ describe('deleteObjects', () => {
 	});
 });
 
+describe('deleteFolder', () => {
+	it('lists and deletes every object under the prefix (including the marker)', async () => {
+		// ListObjectsV2 returns the folder marker plus contents
+		mockSend.mockResolvedValueOnce({
+			Contents: [
+				{ Key: 'docs/' },
+				{ Key: 'docs/a.txt' },
+				{ Key: 'docs/sub/b.txt' }
+			],
+			NextContinuationToken: undefined
+		});
+		// Three DeleteObject calls
+		mockSend.mockResolvedValue({});
+
+		const result = await object.deleteFolder(makeClient(), 'bucket', 'docs/');
+
+		expect(result.deleted).toBe(3);
+		// Recursive listing scoped to the folder prefix (no delimiter → recurses)
+		const listCall = mockSend.mock.calls.find((c: any) => c[0]?._type === 'ListObjectsV2')?.[0];
+		expect(listCall.Prefix).toBe('docs/');
+		expect(listCall.Delimiter).toBeUndefined();
+		expect(mockSend).toHaveBeenCalledWith(
+			expect.objectContaining({ _type: 'DeleteObject', Bucket: 'bucket', Key: 'docs/sub/b.txt' })
+		);
+		expect(mockSend).toHaveBeenCalledWith(
+			expect.objectContaining({ _type: 'DeleteObject', Bucket: 'bucket', Key: 'docs/sub/b.txt' })
+		);
+	});
+
+	it('normalizes a prefix without a trailing slash', async () => {
+		mockSend.mockResolvedValueOnce({ Contents: [{ Key: 'docs/a.txt' }], NextContinuationToken: undefined });
+		mockSend.mockResolvedValue({});
+
+		await object.deleteFolder(makeClient(), 'bucket', 'docs');
+
+		expect(mockSend).toHaveBeenCalledWith(
+			expect.objectContaining({ _type: 'ListObjectsV2', Prefix: 'docs/' })
+		);
+	});
+
+	it('paginates through continuation tokens', async () => {
+		mockSend.mockResolvedValueOnce({
+			Contents: [{ Key: 'big/1.txt' }],
+			NextContinuationToken: 'token-1'
+		});
+		mockSend.mockResolvedValueOnce({}); // delete 1.txt
+		mockSend.mockResolvedValueOnce({
+			Contents: [{ Key: 'big/2.txt' }],
+			NextContinuationToken: undefined
+		});
+		mockSend.mockResolvedValueOnce({}); // delete 2.txt
+
+		const result = await object.deleteFolder(makeClient(), 'bucket', 'big/');
+		expect(result.deleted).toBe(2);
+	});
+
+	it('handles an empty folder', async () => {
+		mockSend.mockResolvedValueOnce({ Contents: [], NextContinuationToken: undefined });
+
+		const result = await object.deleteFolder(makeClient(), 'bucket', 'empty/');
+		expect(result.deleted).toBe(0);
+	});
+});
+
 // ── createFolder ────────────────────────────────────────────────────────
 
 describe('createFolder', () => {

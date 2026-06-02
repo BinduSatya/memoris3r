@@ -180,6 +180,46 @@ async function deleteObjects(
 	}
 }
 
+/**
+ * Recursively delete a "folder": every object whose key starts with the
+ * given prefix, including the zero-byte folder marker itself. S3 has no real
+ * folders, so deleting the prefix marker alone would orphan the contents and
+ * the folder would reappear on the next listing. Paginated to handle folders
+ * with more than 1000 objects.
+ */
+async function deleteFolder(
+	client: S3Client,
+	bucket: string,
+	prefix: string
+): Promise<{ deleted: number }> {
+	// Normalize to a trailing-slash prefix so we only match inside this folder
+	// (e.g. "docs" must not also match "docs-archive/...").
+	const folderPrefix = prefix.endsWith('/') ? prefix : `${prefix}/`;
+	let deleted = 0;
+	let continuationToken: string | undefined;
+
+	do {
+		const response = await client.send(
+			new ListObjectsV2Command({
+				Bucket: bucket,
+				Prefix: folderPrefix,
+				ContinuationToken: continuationToken
+				// No Delimiter — recurse into nested folders
+			})
+		);
+
+		for (const obj of response.Contents || []) {
+			if (!obj.Key) continue;
+			await deleteObject(client, bucket, obj.Key);
+			deleted++;
+		}
+
+		continuationToken = response.NextContinuationToken;
+	} while (continuationToken);
+
+	return { deleted };
+}
+
 async function createFolder(
 	client: S3Client,
 	bucket: string,
@@ -1009,6 +1049,7 @@ export const object = {
 	list: listObjects,
 	delete: deleteObject,
 	deleteMany: deleteObjects,
+	deleteFolder,
 	createFolder,
 	head: headObject,
 	getStream: getObjectStream,

@@ -19,10 +19,23 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ success: true, deleted: 1 });
 		}
 
-		// Bulk delete (existing behavior)
-		await object.deleteMany(client, bucket, keys);
+		// Folder keys (trailing slash) must be deleted recursively — deleting the
+		// prefix marker alone leaves the contents orphaned. Plain object keys are
+		// bulk-deleted as before.
+		const folderKeys = keys.filter((k: unknown): k is string => typeof k === 'string' && k.endsWith('/'));
+		const fileKeys = keys.filter((k: unknown): k is string => typeof k === 'string' && !k.endsWith('/'));
 
-		return json({ success: true, deleted: keys.length });
+		let deleted = 0;
+		for (const folder of folderKeys) {
+			const result = await object.deleteFolder(client, bucket, folder);
+			deleted += result.deleted;
+		}
+		if (fileKeys.length > 0) {
+			await object.deleteMany(client, bucket, fileKeys);
+			deleted += fileKeys.length;
+		}
+
+		return json({ success: true, deleted });
 	} catch (err: any) {
 		console.error('Delete error:', err);
 		return json({ error: 'Failed to delete objects' }, { status: 500 });
