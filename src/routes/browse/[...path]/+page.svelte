@@ -418,12 +418,16 @@
   function handleDelete(keys: string[]) { deleteKeys = keys; deleteOpen = true; }
   function handlePresign(key: string) { shareKey = key; shareOpen = true; }
 
+  function isDesktopLayout() {
+    return typeof window !== 'undefined' && window.innerWidth >= 768;
+  }
+
   function handleSelect(obj: S3Object) {
     if (obj.isFolder) return;
     // Track file view as recent item
     addRecentItem({ bucket: activeBucket, key: obj.key, name: obj.name, isFolder: false });
     selectedObject = obj;
-    rightPanelOpen = true;
+    if (isDesktopLayout()) rightPanelOpen = true;
   }
 
   function handleContextMenu(e: MouseEvent, obj: S3Object) {
@@ -437,7 +441,7 @@
 
   function handleContextPreview(key: string) {
     const obj = objects.find((o) => o.key === key);
-    if (obj) handleSelect(obj);
+    if (obj && isDesktopLayout()) handleSelect(obj);
   }
 
   function handleFileDrop(files: File[]) {
@@ -1107,6 +1111,8 @@
     {userEmail}
     {userName}
     onsearchmodechange={handleSearchModeChange}
+    onupload={() => { uploadOpen = true; }}
+    onback={currentPrefix ? goBack : undefined}
     onlogout={handleLogout}
     ontoggleSidebar={() => { sidebarOpen = true; }}
   />

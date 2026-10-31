@@ -136,12 +136,15 @@
 
 <!-- Sidebar -->
 <aside
-  class="z-50 flex w-60 flex-col bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-transform duration-300 ease-in-out shrink-0
-    {mobileOpen ? 'fixed inset-y-0 left-0 translate-x-0' : 'fixed inset-y-0 left-0 -translate-x-full'} lg:relative lg:translate-x-0"
+  class="z-50 flex w-[82vw] max-w-[320px] flex-col border-r border-gray-200 bg-white/95 shadow-xl backdrop-blur-sm transition-transform duration-300 ease-in-out dark:border-gray-700 dark:bg-gray-900/95 sm:w-64
+    {mobileOpen ? 'fixed inset-y-0 left-0 translate-x-0' : 'fixed inset-y-0 left-0 -translate-x-full'} lg:relative lg:w-60 lg:translate-x-0 lg:shadow-none lg:backdrop-blur-none"
 >
   <!-- Mobile close button -->
-  <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 lg:hidden">
-    <span class="font-semibold text-gray-900 dark:text-white text-sm">Navigation</span>
+  <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700 lg:hidden">
+    <div>
+      <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">Navigation</p>
+      <span class="text-sm font-semibold text-gray-900 dark:text-white">Buckets</span>
+    </div>
     <button
       onclick={() => { mobileOpen = false; }}
       class="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300 transition-colors"
@@ -158,7 +161,7 @@
     <div class="px-3 pt-3 pb-1">
       <button
         onclick={onopenbookmarks}
-        class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 hover:text-yellow-700 dark:hover:text-yellow-400 transition-all duration-150 border border-transparent hover:border-yellow-200 dark:hover:border-yellow-800"
+        class="flex w-full items-center gap-2 rounded-xl border border-transparent px-3 py-2.5 text-sm font-medium text-gray-700 transition-all duration-150 hover:border-yellow-200 hover:bg-yellow-50 hover:text-yellow-700 dark:text-gray-300 dark:hover:border-yellow-800 dark:hover:bg-yellow-900/20 dark:hover:text-yellow-400"
         data-testid="bookmarks-panel-btn"
       >
         <svg class="h-4 w-4 text-yellow-500 shrink-0" fill="currentColor" viewBox="0 0 24 24">
@@ -208,12 +211,12 @@
             <!-- Bucket name button -->
             <button
               onclick={() => handleBucketClick(bucket.name)}
-              class="flex flex-1 items-center rounded-lg px-2 py-2 text-left text-sm font-bold transition-all duration-150 min-w-0
+              class="flex min-w-0 flex-1 items-center rounded-xl px-2.5 py-2.5 text-left text-sm font-semibold transition-all duration-150
                 {isBucketActive(bucket.name)
-                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-2 border-blue-500 -ml-0.5 pl-1.5'
+                  ? 'border border-blue-200 bg-blue-50 text-blue-700 shadow-sm dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300'
                   : bucketContainsActivePath(bucket.name)
                     ? 'text-gray-900 dark:text-white'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'}"
+                    : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'}"
             >
               <!-- Database icon -->
               <svg class="mr-2.5 h-4 w-4 flex-shrink-0 {bucketContainsActivePath(bucket.name) ? 'text-primary-500' : 'text-gray-400 dark:text-gray-500'}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

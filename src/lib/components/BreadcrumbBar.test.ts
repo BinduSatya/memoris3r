@@ -136,4 +136,11 @@ describe('BreadcrumbBar', () => {
 		});
 		expect(screen.getByText(/5 items/)).toBeTruthy();
 	});
+
+	it('shows a compact more actions trigger for mobile-friendly controls', () => {
+		render(BreadcrumbBar, {
+			props: { ...defaultProps, objectCount: 5 },
+		});
+		expect(screen.getByLabelText('More actions')).toBeTruthy();
+	});
 });

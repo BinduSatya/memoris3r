@@ -376,309 +376,386 @@
 {/if}
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-<!-- Table Container -->
-<div class="flex-1 flex flex-col border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 overflow-hidden shadow-sm relative focus-within:ring-1 focus-within:ring-blue-500 focus-within:border-blue-500" tabindex="0" role="grid" aria-label="File list">
-  <!-- Table Header -->
-  <div class="grid {gridCols} bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 px-4 py-2 text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider shrink-0 select-none" role="row">
-    <div class="flex items-center justify-center" role="columnheader">
-      <Checkbox checked={allSelected} onchange={toggleSelectAll} />
-    </div>
-    <button
-      type="button"
-      class="flex items-center gap-1 cursor-pointer hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-150 active:opacity-70 bg-transparent border-none p-0 text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-      onclick={() => toggleSort('name')}
-      title="Sort by Name"
-    >
-      Name <span class="text-blue-500 text-[12px]">{getSortIcon('name')}</span>
-    </button>
-    <button
-      type="button"
-      class="cursor-pointer hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-150 active:opacity-70 bg-transparent border-none p-0 text-left text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-      onclick={() => toggleSort('size')}
-      title="Sort by Size"
-    >
-      Size <span class="text-gray-400 text-[12px]">{getSortIcon('size')}</span>
-    </button>
-    <button
-      type="button"
-      class="cursor-pointer hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-150 active:opacity-70 bg-transparent border-none p-0 text-left text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-      onclick={() => toggleSort('lastModified')}
-      title="Sort by Date"
-    >
-      Last Modified <span class="text-gray-400 text-[12px]">{getSortIcon('lastModified')}</span>
-    </button>
-    <div role="columnheader">Type</div>
-    <div class="text-right" role="columnheader">Actions</div>
-  </div>
-
-  <!-- Table Body -->
+<div class="sm:hidden flex-1 overflow-hidden">
   {#if loading}
-    <div class="flex-1 overflow-y-auto">
+    <div class="flex-1 overflow-y-auto px-2 pb-3 pt-2">
       {#each Array(5) as _, i}
-        <div class="grid {gridCols} px-4 items-center h-10 border-b border-gray-100 dark:border-gray-700/30 animate-pulse">
-          <div class="flex items-center justify-center"><div class="h-4 w-4 rounded bg-gray-200 dark:bg-gray-700"></div></div>
-          <div class="flex items-center gap-2.5">
-            <div class="h-5 w-5 rounded bg-gray-200 dark:bg-gray-700"></div>
-            <div class="h-4 rounded bg-gray-200 dark:bg-gray-700" style="width: {120 + i * 30}px"></div>
+        <div class="mb-2 animate-pulse rounded-xl border border-gray-200 bg-gray-100 p-3 dark:border-gray-700 dark:bg-gray-800/80">
+          <div class="flex items-start gap-3">
+            <div class="mt-1 h-4 w-4 rounded bg-gray-200 dark:bg-gray-700"></div>
+            <div class="flex-1 space-y-2">
+              <div class="h-4 w-2/3 rounded bg-gray-200 dark:bg-gray-700"></div>
+              <div class="h-3 w-1/2 rounded bg-gray-200 dark:bg-gray-700"></div>
+            </div>
           </div>
-          <div><div class="h-4 w-14 rounded bg-gray-200 dark:bg-gray-700"></div></div>
-          <div><div class="h-4 w-16 rounded bg-gray-200 dark:bg-gray-700"></div></div>
-          <div><div class="h-4 w-10 rounded bg-gray-200 dark:bg-gray-700"></div></div>
-          <div><div class="h-4 w-16 rounded bg-gray-200 dark:bg-gray-700 ml-auto"></div></div>
         </div>
       {/each}
     </div>
   {:else if sortedObjects().length === 0}
-    <div class="flex flex-col items-center justify-center h-full py-20 text-gray-400 dark:text-gray-500">
-      <FolderSolid class="h-16 w-16 mb-3" />
-      <p class="font-semibold text-lg">This folder is empty</p>
-      <p class="text-sm mt-1">Drag files here or use the upload button</p>
-    </div>
-  {:else if useVirtualScroll}
-    <!-- Virtual Scroll Mode -->
-    <div
-      bind:this={scrollContainer}
-      class="flex-1 overflow-y-auto"
-      style="max-height: calc(100vh - 280px);"
-      onscroll={handleVirtualScroll}
-      data-testid="virtual-scroll-container"
-    >
-      <div style="height: {totalHeight}px; position: relative;">
-        <div style="position: absolute; top: {offsetY}px; left: 0; right: 0;">
-          {#each visibleObjects as obj, i (obj.key)}
-            {@const actualIndex = virtualStart + i}
-            {@const selected = isSelected(obj)}
-            {@const highlighted = isHighlighted(obj)}
-            {@const focused = isFocused(actualIndex)}
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <div
-              data-row={obj.key}
-              class="grid {gridCols} px-4 items-center border-b transition-all duration-150 active:scale-[0.995] group cursor-pointer select-none
-                {selected
-                  ? 'bg-blue-50/80 dark:bg-blue-900/20 border-blue-200/50 dark:border-blue-800/30 relative after:absolute after:left-0 after:top-0 after:bottom-0 after:w-1 after:bg-blue-500'
-                  : focused
-                    ? 'ring-2 ring-inset ring-blue-400 dark:ring-blue-500 bg-blue-50 dark:bg-blue-900/20 border-gray-100 dark:border-gray-700/30'
-                    : 'border-gray-100 dark:border-gray-700/30 hover:bg-gray-50 dark:hover:bg-gray-700/50'}
-                {highlighted ? ' animate-highlight' : ''}"
-              style="height: {ROW_HEIGHT}px;"
-              onclick={() => handleRowClick(obj)}
-              ondblclick={() => handleRowDblClick(obj)}
-              onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleRowClick(obj); } }}
-              oncontextmenu={(e) => { e.preventDefault(); oncontextmenu?.(e, obj); }}
-              role="row"
-              tabindex="-1"
-            >
-              <!-- Checkbox -->
-              <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-              <div class="flex items-center justify-center" role="presentation" onclick={(e) => e.stopPropagation()}>
-                <Checkbox
-                  checked={selectedKeys.has(obj.key)}
-                  onchange={() => toggleSelect(obj.key)}
-                />
-              </div>
-
-              <!-- Name -->
-              <div class="flex items-center gap-2.5 text-[13px] font-medium text-gray-900 dark:text-white min-w-0">
-                {#if obj.isFolder}
-                  <FolderSolid class="h-5 w-5 flex-shrink-0 text-amber-400 group-hover:scale-110 transition-transform duration-150" />
-                {:else}
-                  {@const iconColor = getFileIconColor(obj.name)}
-                  <FileSolid class="h-5 w-5 flex-shrink-0 {iconColor} group-hover:scale-110 transition-transform duration-150" />
-                {/if}
-                {#if editingKey === obj.key}
-                  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-                  <div class="flex-1 min-w-0" onclick={(e) => e.stopPropagation()}>
-                    <input
-                      type="text"
-                      class="w-full rounded border border-blue-400 bg-white px-1.5 py-0.5 text-[13px] font-medium text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 dark:border-blue-500 dark:bg-gray-700 dark:text-white"
-                      bind:value={editValue}
-                      onkeydown={(e) => handleEditKeydown(e, obj)}
-                      onblur={() => confirmRename(obj)}
-                      use:autoFocusSelect
-                    />
-                  </div>
-                {:else if showFullPath && !obj.isFolder}
-                  <span class="truncate {selected ? 'text-blue-700 dark:text-blue-300 font-bold' : ''}">
-                    <span class="text-gray-400 dark:text-gray-500">{getParentPath(obj.key)}</span><span>{obj.name}</span>
-                  </span>
-                {:else if obj.isFolder}
-                  <span class="truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-150">{obj.name}</span>
-                {:else}
-                  <span class="truncate {selected ? 'text-blue-700 dark:text-blue-300 font-bold' : ''}">{obj.name}</span>
-                {/if}
-                {#if highlighted}
-                  <span class="text-[9px] bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-1 rounded font-bold uppercase tracking-wider animate-pulse">New</span>
-                {/if}
-              </div>
-
-              <!-- Size -->
-              <div class="text-[13px] text-gray-500 dark:text-gray-400 tabular-nums">{formatSize(obj.size)}</div>
-
-              <!-- Last Modified -->
-              <div class="text-[13px] text-gray-500 dark:text-gray-400" title={formatDateFull(obj.lastModified)}>{formatDate(obj.lastModified)}</div>
-
-              <!-- Type -->
-              <div>
-                {#if obj.isFolder}
-                  <span class="text-[11px] text-gray-500 dark:text-gray-400">Folder</span>
-                {:else}
-                  {@const ext = getFileExtension(obj)}
-                  {#if ext}
-                    <span class="text-[11px] font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300">{ext}</span>
-                  {:else}
-                    <span class="text-[11px] text-gray-500 dark:text-gray-400">file</span>
-                  {/if}
-                {/if}
-              </div>
-
-              <!-- Actions -->
-              <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-              <div class="flex items-center justify-end gap-0.5 {selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity duration-150" role="presentation" onclick={(e) => e.stopPropagation()}>
-                {#if !obj.isFolder}
-                  <button
-                    onclick={() => ondownload(obj.key)}
-                    class="rounded p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 dark:hover:text-blue-400 transition-all duration-150 active:scale-90"
-                    title="Download"
-                  >
-                    <DownloadOutline class="h-4 w-4" />
-                  </button>
-                {/if}
-                <button
-                  onclick={() => copyPath(obj.key)}
-                  class="rounded p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:text-gray-200 dark:hover:bg-gray-700 transition-all duration-150 active:scale-90"
-                  title="Copy Path"
-                >
-                  <ClipboardOutline class="h-4 w-4" />
-                </button>
-                <button
-                  onclick={() => ondelete([obj.key])}
-                  class="rounded p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition-all duration-150 active:scale-90"
-                  title="Delete"
-                >
-                  <TrashBinOutline class="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          {/each}
-        </div>
-      </div>
+    <div class="flex flex-col items-center justify-center h-full py-16 text-gray-400 dark:text-gray-500">
+      <FolderSolid class="h-14 w-14 mb-3" />
+      <p class="font-semibold text-base">This folder is empty</p>
+      <p class="text-sm mt-1">Upload a file or create a folder</p>
     </div>
   {:else}
-    <!-- Standard Mode (no virtual scroll) -->
-    <div class="flex-1 overflow-y-auto" bind:this={bodyEl}>
-      {#each sortedObjects() as obj, i (obj.key)}
+    <div class="flex-1 overflow-y-auto px-2 pb-3 pt-2">
+      {#each sortedObjects() as obj (obj.key)}
         {@const selected = isSelected(obj)}
         {@const highlighted = isHighlighted(obj)}
-        {@const focused = isFocused(i)}
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
           data-row={obj.key}
-          class="grid {gridCols} px-4 items-center h-10 border-b transition-all duration-150 active:scale-[0.995] group cursor-pointer select-none
+          class="mb-2 rounded-xl border p-3 shadow-sm transition-all duration-150 active:scale-[0.99]
             {selected
-              ? 'bg-blue-50/80 dark:bg-blue-900/20 border-blue-200/50 dark:border-blue-800/30 relative after:absolute after:left-0 after:top-0 after:bottom-0 after:w-1 after:bg-blue-500'
-              : focused
-                ? 'ring-2 ring-inset ring-blue-400 dark:ring-blue-500 bg-blue-50 dark:bg-blue-900/20 border-gray-100 dark:border-gray-700/30'
-                : 'border-gray-100 dark:border-gray-700/30 hover:bg-gray-50 dark:hover:bg-gray-700/50'}
-            {highlighted ? ' animate-highlight' : ''}"
+              ? 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20'
+              : 'border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700/60'}
+            {highlighted ? 'ring-2 ring-blue-200 dark:ring-blue-800' : ''}"
           onclick={() => handleRowClick(obj)}
-          ondblclick={() => handleRowDblClick(obj)}
-          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleRowClick(obj); } }}
           oncontextmenu={(e) => { e.preventDefault(); oncontextmenu?.(e, obj); }}
           role="row"
-          tabindex="-1"
         >
-          <!-- Checkbox -->
-          <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-          <div class="flex items-center justify-center" role="presentation" onclick={(e) => e.stopPropagation()}>
-            <Checkbox
-              checked={selectedKeys.has(obj.key)}
-              onchange={() => toggleSelect(obj.key)}
-            />
-          </div>
+          <div class="flex items-start gap-3">
+            <div class="pt-0.5" onclick={(e) => e.stopPropagation()}>
+              <Checkbox checked={selectedKeys.has(obj.key)} onchange={() => toggleSelect(obj.key)} />
+            </div>
 
-          <!-- Name -->
-          <div class="flex items-center gap-2.5 text-[13px] font-medium text-gray-900 dark:text-white min-w-0">
-            {#if obj.isFolder}
-              <FolderSolid class="h-5 w-5 flex-shrink-0 text-amber-400 group-hover:scale-110 transition-transform duration-150" />
-            {:else}
-              {@const iconColor = getFileIconColor(obj.name)}
-              <FileSolid class="h-5 w-5 flex-shrink-0 {iconColor} group-hover:scale-110 transition-transform duration-150" />
-            {/if}
-            {#if editingKey === obj.key}
-              <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-              <div class="flex-1 min-w-0" onclick={(e) => e.stopPropagation()}>
-                <input
-                  type="text"
-                  class="w-full rounded border border-blue-400 bg-white px-1.5 py-0.5 text-[13px] font-medium text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 dark:border-blue-500 dark:bg-gray-700 dark:text-white"
-                  bind:value={editValue}
-                  onkeydown={(e) => handleEditKeydown(e, obj)}
-                  onblur={() => confirmRename(obj)}
-                  use:autoFocusSelect
-                />
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2 min-w-0">
+                {#if obj.isFolder}
+                  <FolderSolid class="h-5 w-5 flex-shrink-0 text-amber-400" />
+                {:else}
+                  <FileSolid class="h-5 w-5 flex-shrink-0 {getFileIconColor(obj.name)}" />
+                {/if}
+                <span class="truncate text-sm font-semibold text-gray-900 dark:text-white">{obj.name}</span>
               </div>
-            {:else if showFullPath && !obj.isFolder}
-              <span class="truncate {selected ? 'text-blue-700 dark:text-blue-300 font-bold' : ''}">
-                <span class="text-gray-400 dark:text-gray-500">{getParentPath(obj.key)}</span><span>{obj.name}</span>
-              </span>
-            {:else if obj.isFolder}
-              <span class="truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-150">{obj.name}</span>
-            {:else}
-              <span class="truncate {selected ? 'text-blue-700 dark:text-blue-300 font-bold' : ''}">{obj.name}</span>
-            {/if}
-            {#if highlighted}
-              <span class="text-[9px] bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-1 rounded font-bold uppercase tracking-wider animate-pulse">New</span>
-            {/if}
-          </div>
 
-          <!-- Size -->
-          <div class="text-[13px] text-gray-500 dark:text-gray-400 tabular-nums">{formatSize(obj.size)}</div>
+              <div class="mt-2 grid grid-cols-2 gap-2 text-[11px] text-gray-500 dark:text-gray-400">
+                <div>
+                  <span class="block text-[10px] uppercase tracking-wide text-gray-400">Type</span>
+                  {obj.isFolder ? 'Folder' : getFileExtension(obj) || 'file'}
+                </div>
+                <div class="text-right">
+                  <span class="block text-[10px] uppercase tracking-wide text-gray-400">Size</span>
+                  {formatSize(obj.size)}
+                </div>
+                <div class="col-span-2">
+                  <span class="block text-[10px] uppercase tracking-wide text-gray-400">Modified</span>
+                  {formatDate(obj.lastModified)}
+                </div>
+              </div>
+            </div>
 
-          <!-- Last Modified -->
-          <div class="text-[13px] text-gray-500 dark:text-gray-400" title={formatDateFull(obj.lastModified)}>{formatDate(obj.lastModified)}</div>
-
-          <!-- Type -->
-          <div>
-            {#if obj.isFolder}
-              <span class="text-[11px] text-gray-500 dark:text-gray-400">Folder</span>
-            {:else}
-              {@const ext = getFileExtension(obj)}
-              {#if ext}
-                <span class="text-[11px] font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300">{ext}</span>
-              {:else}
-                <span class="text-[11px] text-gray-500 dark:text-gray-400">file</span>
+            <div class="flex flex-col gap-1" onclick={(e) => e.stopPropagation()}>
+              {#if !obj.isFolder}
+                <button
+                  aria-label="Download {obj.name}"
+                  onclick={() => ondownload(obj.key)}
+                  class="rounded-lg p-1.5 text-gray-500 hover:bg-blue-50 hover:text-blue-600 dark:text-gray-400 dark:hover:bg-blue-900/20 dark:hover:text-blue-400"
+                >
+                  <DownloadOutline class="h-4 w-4" />
+                </button>
               {/if}
-            {/if}
-          </div>
-
-          <!-- Actions -->
-          <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-          <div class="flex items-center justify-end gap-0.5 {selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity duration-150" role="presentation" onclick={(e) => e.stopPropagation()}>
-            {#if !obj.isFolder}
               <button
-                onclick={() => ondownload(obj.key)}
-                class="rounded p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 dark:hover:text-blue-400 transition-all duration-150 active:scale-90"
-                title="Download"
+                aria-label="Copy path for {obj.name}"
+                onclick={() => copyPath(obj.key)}
+                class="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
               >
-                <DownloadOutline class="h-4 w-4" />
+                <ClipboardOutline class="h-4 w-4" />
               </button>
-            {/if}
-            <button
-              onclick={() => copyPath(obj.key)}
-              class="rounded p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:text-gray-200 dark:hover:bg-gray-700 transition-all duration-150 active:scale-90"
-              title="Copy Path"
-            >
-              <ClipboardOutline class="h-4 w-4" />
-            </button>
-            <button
-              onclick={() => ondelete([obj.key])}
-              class="rounded p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition-all duration-150 active:scale-90"
-              title="Delete"
-            >
-              <TrashBinOutline class="h-4 w-4" />
-            </button>
+              <button
+                aria-label="Delete {obj.name}"
+                onclick={() => ondelete([obj.key])}
+                class="rounded-lg p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+              >
+                <TrashBinOutline class="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
       {/each}
     </div>
   {/if}
+</div>
+
+<div class="hidden sm:block">
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+  <!-- Table Container -->
+  <div class="flex-1 flex flex-col border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 overflow-hidden shadow-sm relative focus-within:ring-1 focus-within:ring-blue-500 focus-within:border-blue-500" tabindex="0" role="grid" aria-label="File list">
+    <!-- Table Header -->
+    <div class="grid {gridCols} bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 px-4 py-2 text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider shrink-0 select-none" role="row">
+      <div class="flex items-center justify-center" role="columnheader">
+        <Checkbox checked={allSelected} onchange={toggleSelectAll} />
+      </div>
+      <button
+        type="button"
+        class="flex items-center gap-1 cursor-pointer hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-150 active:opacity-70 bg-transparent border-none p-0 text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+        onclick={() => toggleSort('name')}
+        title="Sort by Name"
+      >
+        Name <span class="text-blue-500 text-[12px]">{getSortIcon('name')}</span>
+      </button>
+      <button
+        type="button"
+        class="cursor-pointer hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-150 active:opacity-70 bg-transparent border-none p-0 text-left text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+        onclick={() => toggleSort('size')}
+        title="Sort by Size"
+      >
+        Size <span class="text-gray-400 text-[12px]">{getSortIcon('size')}</span>
+      </button>
+      <button
+        type="button"
+        class="cursor-pointer hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-150 active:opacity-70 bg-transparent border-none p-0 text-left text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+        onclick={() => toggleSort('lastModified')}
+        title="Sort by Date"
+      >
+        Last Modified <span class="text-gray-400 text-[12px]">{getSortIcon('lastModified')}</span>
+      </button>
+      <div role="columnheader">Type</div>
+      <div class="text-right" role="columnheader">Actions</div>
+    </div>
+
+    <!-- Table Body -->
+    {#if loading}
+      <div class="flex-1 overflow-y-auto">
+        {#each Array(5) as _, i}
+          <div class="grid {gridCols} px-4 items-center h-10 border-b border-gray-100 dark:border-gray-700/30 animate-pulse">
+            <div class="flex items-center justify-center"><div class="h-4 w-4 rounded bg-gray-200 dark:bg-gray-700"></div></div>
+            <div class="flex items-center gap-2.5">
+              <div class="h-5 w-5 rounded bg-gray-200 dark:bg-gray-700"></div>
+              <div class="h-4 rounded bg-gray-200 dark:bg-gray-700" style="width: {120 + i * 30}px"></div>
+            </div>
+            <div><div class="h-4 w-14 rounded bg-gray-200 dark:bg-gray-700"></div></div>
+            <div><div class="h-4 w-16 rounded bg-gray-200 dark:bg-gray-700"></div></div>
+            <div><div class="h-4 w-10 rounded bg-gray-200 dark:bg-gray-700"></div></div>
+            <div><div class="h-4 w-16 rounded bg-gray-200 dark:bg-gray-700 ml-auto"></div></div>
+          </div>
+        {/each}
+      </div>
+    {:else if sortedObjects().length === 0}
+      <div class="flex flex-col items-center justify-center h-full py-20 text-gray-400 dark:text-gray-500">
+        <FolderSolid class="h-16 w-16 mb-3" />
+        <p class="font-semibold text-lg">This folder is empty</p>
+        <p class="text-sm mt-1">Drag files here or use the upload button</p>
+      </div>
+    {:else if useVirtualScroll}
+      <!-- Virtual Scroll Mode -->
+      <div
+        bind:this={scrollContainer}
+        class="flex-1 overflow-y-auto"
+        style="max-height: calc(100vh - 280px);"
+        onscroll={handleVirtualScroll}
+        data-testid="virtual-scroll-container"
+      >
+        <div style="height: {totalHeight}px; position: relative;">
+          <div style="position: absolute; top: {offsetY}px; left: 0; right: 0;">
+            {#each visibleObjects as obj, i (obj.key)}
+              {@const actualIndex = virtualStart + i}
+              {@const selected = isSelected(obj)}
+              {@const highlighted = isHighlighted(obj)}
+              {@const focused = isFocused(actualIndex)}
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <div
+                data-row={obj.key}
+                class="grid {gridCols} px-4 items-center border-b transition-all duration-150 active:scale-[0.995] group cursor-pointer select-none
+                  {selected
+                    ? 'bg-blue-50/80 dark:bg-blue-900/20 border-blue-200/50 dark:border-blue-800/30 relative after:absolute after:left-0 after:top-0 after:bottom-0 after:w-1 after:bg-blue-500'
+                    : focused
+                      ? 'ring-2 ring-inset ring-blue-400 dark:ring-blue-500 bg-blue-50 dark:bg-blue-900/20 border-gray-100 dark:border-gray-700/30'
+                      : 'border-gray-100 dark:border-gray-700/30 hover:bg-gray-50 dark:hover:bg-gray-700/50'}
+                  {highlighted ? ' animate-highlight' : ''}"
+                style="height: {ROW_HEIGHT}px;"
+                onclick={() => handleRowClick(obj)}
+                ondblclick={() => handleRowDblClick(obj)}
+                onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleRowClick(obj); } }}
+                oncontextmenu={(e) => { e.preventDefault(); oncontextmenu?.(e, obj); }}
+                role="row"
+                tabindex="-1"
+              >
+                <div class="flex items-center justify-center" role="presentation" onclick={(e) => e.stopPropagation()}>
+                  <Checkbox checked={selectedKeys.has(obj.key)} onchange={() => toggleSelect(obj.key)} />
+                </div>
+
+                <div class="flex items-center gap-2.5 text-[13px] font-medium text-gray-900 dark:text-white min-w-0">
+                  {#if obj.isFolder}
+                    <FolderSolid class="h-5 w-5 flex-shrink-0 text-amber-400 group-hover:scale-110 transition-transform duration-150" />
+                  {:else}
+                    {@const iconColor = getFileIconColor(obj.name)}
+                    <FileSolid class="h-5 w-5 flex-shrink-0 {iconColor} group-hover:scale-110 transition-transform duration-150" />
+                  {/if}
+                  {#if editingKey === obj.key}
+                    <div class="flex-1 min-w-0" onclick={(e) => e.stopPropagation()}>
+                      <input
+                        type="text"
+                        class="w-full rounded border border-blue-400 bg-white px-1.5 py-0.5 text-[13px] font-medium text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 dark:border-blue-500 dark:bg-gray-700 dark:text-white"
+                        bind:value={editValue}
+                        onkeydown={(e) => handleEditKeydown(e, obj)}
+                        onblur={() => confirmRename(obj)}
+                        use:autoFocusSelect
+                      />
+                    </div>
+                  {:else if showFullPath && !obj.isFolder}
+                    <span class="truncate {selected ? 'text-blue-700 dark:text-blue-300 font-bold' : ''}">
+                      <span class="text-gray-400 dark:text-gray-500">{getParentPath(obj.key)}</span><span>{obj.name}</span>
+                    </span>
+                  {:else if obj.isFolder}
+                    <span class="truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-150">{obj.name}</span>
+                  {:else}
+                    <span class="truncate {selected ? 'text-blue-700 dark:text-blue-300 font-bold' : ''}">{obj.name}</span>
+                  {/if}
+                  {#if highlighted}
+                    <span class="text-[9px] bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-1 rounded font-bold uppercase tracking-wider animate-pulse">New</span>
+                  {/if}
+                </div>
+
+                <div class="text-[13px] text-gray-500 dark:text-gray-400 tabular-nums">{formatSize(obj.size)}</div>
+
+                <div class="text-[13px] text-gray-500 dark:text-gray-400" title={formatDateFull(obj.lastModified)}>{formatDate(obj.lastModified)}</div>
+
+                <div>
+                  {#if obj.isFolder}
+                    <span class="text-[11px] text-gray-500 dark:text-gray-400">Folder</span>
+                  {:else}
+                    {@const ext = getFileExtension(obj)}
+                    {#if ext}
+                      <span class="text-[11px] font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300">{ext}</span>
+                    {:else}
+                      <span class="text-[11px] text-gray-500 dark:text-gray-400">file</span>
+                    {/if}
+                  {/if}
+                </div>
+
+                <div class="flex items-center justify-end gap-0.5 {selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity duration-150" role="presentation" onclick={(e) => e.stopPropagation()}>
+                  {#if !obj.isFolder}
+                    <button
+                      onclick={() => ondownload(obj.key)}
+                      class="rounded p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 dark:hover:text-blue-400 transition-all duration-150 active:scale-90"
+                      title="Download"
+                    >
+                      <DownloadOutline class="h-4 w-4" />
+                    </button>
+                  {/if}
+                  <button
+                    onclick={() => copyPath(obj.key)}
+                    class="rounded p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:text-gray-200 dark:hover:bg-gray-700 transition-all duration-150 active:scale-90"
+                    title="Copy Path"
+                  >
+                    <ClipboardOutline class="h-4 w-4" />
+                  </button>
+                  <button
+                    onclick={() => ondelete([obj.key])}
+                    class="rounded p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition-all duration-150 active:scale-90"
+                    title="Delete"
+                  >
+                    <TrashBinOutline class="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            {/each}
+          </div>
+        </div>
+      </div>
+    {:else}
+      <div class="flex-1 overflow-y-auto" bind:this={bodyEl}>
+        {#each sortedObjects() as obj, i (obj.key)}
+          {@const selected = isSelected(obj)}
+          {@const highlighted = isHighlighted(obj)}
+          {@const focused = isFocused(i)}
+          <div
+            data-row={obj.key}
+            class="grid {gridCols} px-4 items-center h-10 border-b transition-all duration-150 active:scale-[0.995] group cursor-pointer select-none
+              {selected
+                ? 'bg-blue-50/80 dark:bg-blue-900/20 border-blue-200/50 dark:border-blue-800/30 relative after:absolute after:left-0 after:top-0 after:bottom-0 after:w-1 after:bg-blue-500'
+                : focused
+                  ? 'ring-2 ring-inset ring-blue-400 dark:ring-blue-500 bg-blue-50 dark:bg-blue-900/20 border-gray-100 dark:border-gray-700/30'
+                  : 'border-gray-100 dark:border-gray-700/30 hover:bg-gray-50 dark:hover:bg-gray-700/50'}
+              {highlighted ? ' animate-highlight' : ''}"
+            onclick={() => handleRowClick(obj)}
+            ondblclick={() => handleRowDblClick(obj)}
+            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleRowClick(obj); } }}
+            oncontextmenu={(e) => { e.preventDefault(); oncontextmenu?.(e, obj); }}
+            role="row"
+            tabindex="-1"
+          >
+            <div class="flex items-center justify-center" role="presentation" onclick={(e) => e.stopPropagation()}>
+              <Checkbox checked={selectedKeys.has(obj.key)} onchange={() => toggleSelect(obj.key)} />
+            </div>
+
+            <div class="flex items-center gap-2.5 text-[13px] font-medium text-gray-900 dark:text-white min-w-0">
+              {#if obj.isFolder}
+                <FolderSolid class="h-5 w-5 flex-shrink-0 text-amber-400 group-hover:scale-110 transition-transform duration-150" />
+              {:else}
+                {@const iconColor = getFileIconColor(obj.name)}
+                <FileSolid class="h-5 w-5 flex-shrink-0 {iconColor} group-hover:scale-110 transition-transform duration-150" />
+              {/if}
+              {#if editingKey === obj.key}
+                <div class="flex-1 min-w-0" onclick={(e) => e.stopPropagation()}>
+                  <input
+                    type="text"
+                    class="w-full rounded border border-blue-400 bg-white px-1.5 py-0.5 text-[13px] font-medium text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 dark:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    bind:value={editValue}
+                    onkeydown={(e) => handleEditKeydown(e, obj)}
+                    onblur={() => confirmRename(obj)}
+                    use:autoFocusSelect
+                  />
+                </div>
+              {:else if showFullPath && !obj.isFolder}
+                <span class="truncate {selected ? 'text-blue-700 dark:text-blue-300 font-bold' : ''}">
+                  <span class="text-gray-400 dark:text-gray-500">{getParentPath(obj.key)}</span><span>{obj.name}</span>
+                </span>
+              {:else if obj.isFolder}
+                <span class="truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-150">{obj.name}</span>
+              {:else}
+                <span class="truncate {selected ? 'text-blue-700 dark:text-blue-300 font-bold' : ''}">{obj.name}</span>
+              {/if}
+              {#if highlighted}
+                <span class="text-[9px] bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-1 rounded font-bold uppercase tracking-wider animate-pulse">New</span>
+              {/if}
+            </div>
+
+            <div class="text-[13px] text-gray-500 dark:text-gray-400 tabular-nums">{formatSize(obj.size)}</div>
+
+            <div class="text-[13px] text-gray-500 dark:text-gray-400" title={formatDateFull(obj.lastModified)}>{formatDate(obj.lastModified)}</div>
+
+            <div>
+              {#if obj.isFolder}
+                <span class="text-[11px] text-gray-500 dark:text-gray-400">Folder</span>
+              {:else}
+                {@const ext = getFileExtension(obj)}
+                {#if ext}
+                  <span class="text-[11px] font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300">{ext}</span>
+                {:else}
+                  <span class="text-[11px] text-gray-500 dark:text-gray-400">file</span>
+                {/if}
+              {/if}
+            </div>
+
+            <div class="flex items-center justify-end gap-0.5 {selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity duration-150" role="presentation" onclick={(e) => e.stopPropagation()}>
+              {#if !obj.isFolder}
+                <button
+                  onclick={() => ondownload(obj.key)}
+                  class="rounded p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 dark:hover:text-blue-400 transition-all duration-150 active:scale-90"
+                  title="Download"
+                >
+                  <DownloadOutline class="h-4 w-4" />
+                </button>
+              {/if}
+              <button
+                onclick={() => copyPath(obj.key)}
+                class="rounded p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:text-gray-200 dark:hover:bg-gray-700 transition-all duration-150 active:scale-90"
+                title="Copy Path"
+              >
+                <ClipboardOutline class="h-4 w-4" />
+              </button>
+              <button
+                onclick={() => ondelete([obj.key])}
+                class="rounded p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition-all duration-150 active:scale-90"
+                title="Delete"
+              >
+                <TrashBinOutline class="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        {/each}
+      </div>
+    {/if}
+  </div>
 </div>
