@@ -90,7 +90,7 @@
         <path d="M15 9v6"/>
       </svg>
     </div>
-    <span class="font-semibold text-primary-600 dark:text-primary-400 text-base hidden sm:inline">ObjectDock</span>
+    <span class="font-semibold text-primary-600 dark:text-primary-400 text-base hidden sm:inline">MemoriS3</span>
   </div>
 
   <!-- Center: Search bar with folder prefix badge -->

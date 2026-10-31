@@ -113,6 +113,17 @@ describe('createS3Client', () => {
 		});
 	});
 
+	it('throws a clear error for AWS Console bucket URLs used as S3 endpoints', () => {
+		expect(() =>
+			createS3Client({
+				accessKeyId: 'test-key',
+				secretAccessKey: 'test-secret',
+				region: 'ap-south-1',
+				endpoint: 'https://ap-south-1.console.aws.amazon.com/s3/buckets?region=ap-south-1'
+			})
+		).toThrow(/S3 API endpoint/);
+	});
+
 	it('creates client without endpoint (AWS mode)', () => {
 		createS3Client({
 			accessKeyId: 'test-key',
@@ -536,18 +547,54 @@ describe('createBucket', () => {
 		);
 	});
 
+	it('adds a browser-upload CORS rule when creating a bucket', async () => {
+		mockSend.mockResolvedValue({});
+
+		await bucket.create(makeClient(), 'new-bucket');
+
+		expect(mockSend).toHaveBeenCalledWith(
+			expect.objectContaining({
+				_type: 'PutBucketCors',
+				Bucket: 'new-bucket',
+				CORSConfiguration: expect.objectContaining({
+					CORSRules: expect.arrayContaining([
+						expect.objectContaining({
+							AllowedOrigins: ['*'],
+							AllowedMethods: expect.arrayContaining(['GET', 'PUT', 'POST', 'DELETE', 'HEAD']),
+							AllowedHeaders: ['*']
+						})
+					])
+				})
+			})
+		);
+	});
+
 	it('creates bucket with versioning enabled', async () => {
 		mockSend.mockResolvedValue({}); // CreateBucket + PutBucketVersioning
 
 		await bucket.create(makeClient(), 'versioned-bucket', { versioning: true });
 
-		// Should call send twice: CreateBucket + PutBucketVersioning
-		expect(mockSend).toHaveBeenCalledTimes(2);
+		// CreateBucket + PutBucketVersioning + default browser CORS
+		expect(mockSend).toHaveBeenCalledTimes(3);
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
 				_type: 'PutBucketVersioning',
 				Bucket: 'versioned-bucket',
 				VersioningConfiguration: { Status: 'Enabled' }
+			})
+		);
+		expect(mockSend).toHaveBeenCalledWith(
+			expect.objectContaining({
+				_type: 'PutBucketCors',
+				Bucket: 'versioned-bucket',
+				CORSConfiguration: expect.objectContaining({
+					CORSRules: expect.arrayContaining([
+						expect.objectContaining({
+							AllowedOrigins: ['*'],
+							AllowedMethods: expect.arrayContaining(['GET', 'PUT', 'POST', 'DELETE', 'HEAD'])
+						})
+					])
+				})
 			})
 		);
 	});
@@ -560,13 +607,26 @@ describe('createBucket', () => {
 			objectLocking: true
 		});
 
-		// Should call send only once: CreateBucket (with ObjectLockEnabledForBucket)
-		expect(mockSend).toHaveBeenCalledTimes(1);
+		// CreateBucket (with ObjectLockEnabledForBucket) + default browser CORS
+		expect(mockSend).toHaveBeenCalledTimes(2);
 		expect(mockSend).toHaveBeenCalledWith(
 			expect.objectContaining({
 				_type: 'CreateBucket',
 				Bucket: 'locked-bucket',
 				ObjectLockEnabledForBucket: true
+			})
+		);
+		expect(mockSend).toHaveBeenCalledWith(
+			expect.objectContaining({
+				_type: 'PutBucketCors',
+				Bucket: 'locked-bucket',
+				CORSConfiguration: expect.objectContaining({
+					CORSRules: expect.arrayContaining([
+						expect.objectContaining({
+							AllowedOrigins: ['*']
+						})
+					])
+				})
 			})
 		);
 	});

@@ -87,7 +87,17 @@ export function createS3Client(credentials: S3Credentials): S3Client {
 	};
 
 	if (credentials.endpoint) {
-		config.endpoint = credentials.endpoint;
+		const endpoint = credentials.endpoint.trim();
+		if (
+			endpoint.includes('console.aws.amazon.com/s3') ||
+			endpoint.includes('console.aws.amazon.com') ||
+			/\/s3\/buckets(\?|$)/i.test(endpoint)
+		) {
+			throw new Error(
+				'Invalid S3 endpoint: expected the S3 API endpoint (for example https://s3.us-east-1.amazonaws.com or http://localhost:9000), not the AWS Console bucket page.'
+			);
+		}
+		config.endpoint = endpoint;
 		config.forcePathStyle = true; // Required for MinIO and most S3-compatible services
 	}
 
@@ -324,6 +334,27 @@ async function createBucket(
 			})
 		);
 	}
+
+	// Browser-based uploads use pre-signed PUT requests; without a CORS policy they
+	// are rejected before the request reaches S3. Apply a permissive default for the
+	// app origin so direct uploads can work immediately after bucket creation.
+	await client.send(
+		new PutBucketCorsCommand({
+			Bucket: name,
+			CORSConfiguration: {
+				CORSRules: [
+					{
+						ID: 'browser-upload-default',
+						AllowedOrigins: ['*'],
+						AllowedMethods: ['GET', 'PUT', 'POST', 'DELETE', 'HEAD'],
+						AllowedHeaders: ['*'],
+						ExposeHeaders: ['ETag', 'x-amz-request-id', 'x-amz-version-id'],
+						MaxAgeSeconds: 3600
+					}
+				]
+			}
+		})
+	);
 }
 
 async function deleteBucket(client: S3Client, name: string): Promise<void> {

@@ -6,7 +6,7 @@
 </script>
 
 <svelte:head>
-  <title>ObjectDock</title>
+  <title>MemoriS3</title>
 </svelte:head>
 
 {@render children()}

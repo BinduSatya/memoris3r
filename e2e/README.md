@@ -1,4 +1,4 @@
-# E2E Tests — ObjectDock S3 Viewer
+# E2E Tests — MemoriS3 S3 Viewer
 
 End-to-end tests using **Playwright** against a real **MinIO** instance with **10,000+ seeded objects**, **5 levels of nesting**, and **diverse file types/sizes**.
 

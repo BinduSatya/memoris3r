@@ -95,7 +95,7 @@
                 <path d="M15 9v6"/>
               </svg>
             </div>
-            <span class="text-lg font-semibold text-white tracking-tight">ObjectDock</span>
+            <span class="text-lg font-semibold text-white tracking-tight">MemoriS3</span>
           </div>
           <p class="text-[13px] leading-[18px] text-gray-400 max-w-[280px]">
             S3-compatible object storage browser for AWS, MinIO, and other providers.
@@ -146,7 +146,7 @@
                 <path d="M15 9v6"/>
               </svg>
             </div>
-            <span class="text-lg font-semibold text-gray-900 dark:text-white tracking-tight">ObjectDock</span>
+            <span class="text-lg font-semibold text-gray-900 dark:text-white tracking-tight">MemoriS3</span>
           </div>
         </div>
 

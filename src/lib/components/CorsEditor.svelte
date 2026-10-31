@@ -530,7 +530,7 @@
           data-testid="cors-quick-objectdock"
           class="flex-1 inline-flex items-center justify-center gap-1 rounded-md bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50 px-2 py-1.5 text-[10px] font-semibold transition-colors"
         >
-          Allow ObjectDock Origin
+          Allow MemoriS3 Origin
         </button>
       </div>
     </div>
