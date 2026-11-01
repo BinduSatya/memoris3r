@@ -65,6 +65,7 @@
   let commandPaletteOpen = $state(false);
   let searchQuery = $state('');
   let highlightKeys = $state<string[]>([]);
+  let previewScrollTop = $state(0);
 
   // Recursive search state
   let searchResults = $state<S3Object[]>([]);
@@ -422,12 +423,29 @@
     return typeof window !== 'undefined' && window.innerWidth >= 768;
   }
 
+  function captureListScroll() {
+    if (typeof window === 'undefined') return;
+    const node = document.querySelector('[data-file-list-scroll]') as HTMLElement | null;
+    if (node) previewScrollTop = node.scrollTop;
+  }
+
+  function restoreListScroll() {
+    if (typeof window === 'undefined') return;
+    requestAnimationFrame(() => {
+      const node = document.querySelector('[data-file-list-scroll]') as HTMLElement | null;
+      if (node) node.scrollTop = previewScrollTop;
+    });
+  }
+
   function handleSelect(obj: S3Object) {
     if (obj.isFolder) return;
     // Track file view as recent item
     addRecentItem({ bucket: activeBucket, key: obj.key, name: obj.name, isFolder: false });
     selectedObject = obj;
-    if (isDesktopLayout()) rightPanelOpen = true;
+    if (!isDesktopLayout()) {
+      captureListScroll();
+    }
+    rightPanelOpen = true;
   }
 
   function handleContextMenu(e: MouseEvent, obj: S3Object) {
@@ -875,6 +893,7 @@
       }
       if (rightPanelOpen) {
         rightPanelOpen = false;
+        if (!isDesktopLayout()) restoreListScroll();
         selectedObject = null;
         e.preventDefault();
         return;
@@ -1158,11 +1177,13 @@
           <BreadcrumbBar
             bucket={activeBucket}
             prefix={currentPrefix}
+            buckets={buckets}
             bucketInfo={bucketDetails}
             creationDate={activeBucketCreationDate}
             {objectCount}
             {isTruncated}
             onnavigate={navigateToPrefix}
+            onselectbucket={selectBucket}
             onrefresh={handleRefresh}
             oncreatefolder={() => { createFolderOpen = true; }}
             onupload={() => { uploadOpen = true; }}

@@ -398,7 +398,7 @@
       <p class="text-sm mt-1">Upload a file or create a folder</p>
     </div>
   {:else}
-    <div class="flex-1 overflow-y-auto px-2 pb-3 pt-2">
+    <div data-file-list-scroll="true" class="flex-1 overflow-y-auto px-2 pb-3 pt-2">
       {#each sortedObjects() as obj (obj.key)}
         {@const selected = isSelected(obj)}
         {@const highlighted = isHighlighted(obj)}
@@ -445,6 +445,20 @@
             </div>
 
             <div class="flex flex-col gap-1" onclick={(e) => e.stopPropagation()}>
+              <button
+                aria-label="More actions for {obj.name}"
+                onclick={(event) => {
+                  event.stopPropagation();
+                  oncontextmenu?.(event, obj);
+                }}
+                class="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+              >
+                <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                  <circle cx="12" cy="5" r="1.8" />
+                  <circle cx="12" cy="12" r="1.8" />
+                  <circle cx="12" cy="19" r="1.8" />
+                </svg>
+              </button>
               {#if !obj.isFolder}
                 <button
                   aria-label="Download {obj.name}"

@@ -16,6 +16,11 @@
 
   let files = $state<File[]>([]);
   let dragOver = $state(false);
+  let fileInput: HTMLInputElement | null = $state(null);
+
+  function triggerFilePicker() {
+    fileInput?.click();
+  }
 
   function handleDrop(e: DragEvent) {
     e.preventDefault();
@@ -39,6 +44,8 @@
     if (input.files) {
       addFiles(Array.from(input.files));
     }
+
+    input.value = '';
   }
 
   function addFiles(newFiles: File[]) {
@@ -78,8 +85,16 @@
     ondrop={handleDrop}
     ondragover={handleDragOver}
     ondragleave={handleDragLeave}
+    onclick={triggerFilePicker}
+    onkeydown={(e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        triggerFilePicker();
+      }
+    }}
     role="button"
     tabindex="0"
+    aria-label="Select files to upload"
   >
     <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full {dragOver ? 'bg-primary-100 dark:bg-primary-900/40' : 'bg-gray-100 dark:bg-gray-600'}">
       <UploadOutline class="h-6 w-6 {dragOver ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 dark:text-gray-300'}" />
@@ -89,11 +104,12 @@
     </p>
     <p class="text-xs text-gray-400 dark:text-gray-500">Upload to: {bucket}/{prefix || '(root)'}</p>
     <input
+      bind:this={fileInput}
       type="file"
       multiple
-      class="absolute inset-0 cursor-pointer opacity-0"
+      class="sr-only"
       onchange={handleFileInput}
-      style="position: relative; margin-top: 8px;"
+      aria-label="Choose files"
     />
   </div>
 

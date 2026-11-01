@@ -143,4 +143,11 @@ describe('BreadcrumbBar', () => {
 		});
 		expect(screen.getByLabelText('More actions')).toBeTruthy();
 	});
+
+	it('shows a bucket selector for quick mobile bucket switching', () => {
+		render(BreadcrumbBar, {
+			props: { ...defaultProps, buckets: [{ name: 'alpha' }, { name: 'beta' }] },
+		});
+		expect(screen.getByLabelText('Select bucket')).toBeTruthy();
+	});
 });
